@@ -1,0 +1,2565 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apex Hoops Manager | Tournament Bracket & Simulation Tycoon</title>
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons via CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Canvas Confetti via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            slate: {
+              850: '#151e2e',
+              925: '#0b111e',
+              950: '#060a12'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+
+    body {
+      background-color: #060a12;
+      color: #f8fafc;
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b111e;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+
+    .bracket-connector {
+      position: relative;
+    }
+    .pulse-live {
+      animation: pulseGlow 1.8s infinite;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45); }
+      50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-emerald-500 selection:text-slate-950">
+
+  <!-- TOP HEADER -->
+  <header class="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-925/95 backdrop-blur-md">
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+      <!-- Brand & Franchise Name -->
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg shadow-emerald-900/30">
+          <i data-lucide="trophy" class="w-6 h-6 text-slate-950 stroke-[2.5]"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">Franchise HQ</span>
+            <span id="headerSeasonBadge" class="text-[11px] font-mono bg-slate-800 text-slate-300 px-2 py-0.5 rounded border border-slate-700">Season 1</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <h1 id="headerFranchiseName" class="text-lg sm:text-xl font-extrabold tracking-tight text-white">Apex Vipers</h1>
+            <button onclick="promptRenameFranchise()" title="Rename Franchise" class="text-slate-400 hover:text-emerald-400 transition p-1 rounded">
+              <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI Status Bar -->
+      <div class="flex flex-wrap items-center gap-3 sm:gap-5">
+        <!-- Cash -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2 flex items-center gap-2.5">
+          <div class="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+            <i data-lucide="wallet" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Available Funds</div>
+            <div id="headerCash" class="text-sm sm:text-base font-mono font-bold text-emerald-400">$250,000</div>
+          </div>
+        </div>
+
+        <!-- Record -->
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2 flex items-center gap-2.5">
+          <div class="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
+            <i data-lucide="activity" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">All-Time Record</div>
+            <div id="headerRecord" class="text-sm sm:text-base font-mono font-bold text-white">0W - 0L <span class="text-xs text-amber-400 font-normal">(0 Titles)</span></div>
+          </div>
+        </div>
+
+        <!-- Team OVR & Fatigue Quick Pill -->
+        <div class="hidden md:flex bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2 items-center gap-4">
+          <div>
+            <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">OVR Rating</div>
+            <div id="headerOVR" class="text-sm font-mono font-bold text-indigo-400">82</div>
+          </div>
+          <div class="h-6 w-px bg-slate-800"></div>
+          <div>
+            <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Fatigue</div>
+            <div id="headerFatigue" class="text-sm font-mono font-bold text-emerald-400">0%</div>
+          </div>
+        </div>
+
+        <!-- Reset Save -->
+        <button onclick="openResetConfirmModal()" class="px-3 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 border border-rose-800/70 text-xs font-semibold flex items-center gap-1.5 transition">
+          <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+          <span>Reset Save</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 flex items-center justify-between border-t border-slate-800/60 bg-slate-950/60">
+      <nav class="flex space-x-1 sm:space-x-2 overflow-x-auto py-1.5" aria-label="Tabs">
+        <button onclick="switchTab('bracket')" id="tabBtn-bracket" class="tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 transition whitespace-nowrap">
+          <i data-lucide="git-branch" class="w-4 h-4"></i>
+          <span>Bracket & Match Center</span>
+        </button>
+        <button onclick="switchTab('franchise')" id="tabBtn-franchise" class="tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 transition whitespace-nowrap">
+          <i data-lucide="shield" class="w-4 h-4"></i>
+          <span>Franchise Roster & Tycoon Upgrades</span>
+        </button>
+        <button onclick="switchTab('standings')" id="tabBtn-standings" class="tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 transition whitespace-nowrap">
+          <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+          <span>League Standings & Power Rankings</span>
+        </button>
+      </nav>
+
+      <div id="headerRoundStatus" class="hidden lg:flex items-center gap-2 text-xs text-slate-400">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+        <span id="headerCurrentStageText">Round of 16 Active</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT AREA -->
+  <main class="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 py-6">
+
+    <!-- TAB 1: BRACKET & MATCH CENTER -->
+    <section id="tabContent-bracket" class="space-y-6">
+      <!-- Top Action Banner / Match Control Center -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <!-- Next User Matchup Card -->
+        <div id="userNextMatchCard" class="lg:col-span-8 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-850 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          <!-- Populated dynamically by JS -->
+        </div>
+
+        <!-- Tournament Round & Quick Controls Card -->
+        <div class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Tournament Operations</span>
+              <span id="roundProgressBadge" class="text-xs font-mono px-2.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">Round 1 of 4</span>
+            </div>
+            <h2 id="roundTitleDisplay" class="text-lg font-bold text-white">Round of 16</h2>
+            <p id="roundSubtitleDisplay" class="text-xs text-slate-400 mt-1">Click any matchup tile below to preview tactical ratings, simulate live play-by-play, or inspect completed box scores.</p>
+          </div>
+
+          <!-- Payout Structure Mini Table -->
+          <div class="bg-slate-950/70 border border-slate-800/80 rounded-xl p-3 space-y-1.5 text-xs">
+            <div class="font-semibold text-slate-300 flex items-center justify-between">
+              <span>Round Victory Prize Pool</span>
+              <i data-lucide="coins" class="w-3.5 h-3.5 text-amber-400"></i>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-slate-400 font-mono text-[11px]">
+              <div class="flex justify-between"><span>R16 Win:</span><span class="text-emerald-400">+$150k</span></div>
+              <div class="flex justify-between"><span>QF Win:</span><span class="text-emerald-400">+$250k</span></div>
+              <div class="flex justify-between"><span>SF Win:</span><span class="text-emerald-400">+$400k</span></div>
+              <div class="flex justify-between"><span>Title Win:</span><span class="text-amber-400">+$800k</span></div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div id="bracketGlobalActions" class="flex flex-col sm:flex-row lg:flex-col gap-2.5">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Legend & Filter Bar -->
+      <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 rounded-xl px-4 py-2.5 text-xs">
+        <div class="flex flex-wrap items-center gap-4">
+          <span class="font-semibold text-slate-300">Bracket Key:</span>
+          <span class="flex items-center gap-1.5 text-slate-400">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span> Your Franchise
+          </span>
+          <span class="flex items-center gap-1.5 text-slate-400">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span> Scouted Opponent (+10% Win Boost)
+          </span>
+          <span class="flex items-center gap-1.5 text-slate-400">
+            <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span> Scheduled Matchup
+          </span>
+          <span class="flex items-center gap-1.5 text-slate-400">
+            <span class="w-2.5 h-2.5 rounded-full bg-slate-600"></span> Completed (Click for Box Score)
+          </span>
+        </div>
+        <div class="text-slate-400 font-mono">
+          Single Elimination • 16 Teams
+        </div>
+      </div>
+
+      <!-- 16-TEAM INTERACTIVE BRACKET TREE -->
+      <div class="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 sm:p-6 overflow-x-auto">
+        <div id="bracketTreeContainer" class="min-w-[1120px] grid grid-cols-4 gap-6 items-stretch">
+          <!-- Populated dynamically by JS: Columns for R16, QF, SF, Championship -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: FRANCHISE ROSTER, STATS & TYCOON UPGRADES -->
+    <section id="tabContent-franchise" class="hidden space-y-6">
+      <!-- Top Franchise Overview & Core Ratings -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Core Ratings & Tactical Philosophy -->
+        <div class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+          <div class="flex items-start justify-between">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">Franchise Core Ratings</span>
+              <h2 id="franchiseTabTeamName" class="text-2xl font-extrabold text-white mt-0.5">Apex Vipers</h2>
+              <p class="text-xs text-slate-400 mt-1">Ratings directly drive possession efficiency, pace, and defensive stops in the simulation engine.</p>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] font-mono uppercase text-slate-400 block">Seed</span>
+              <span id="franchiseSeedBadge" class="text-xl font-mono font-extrabold text-amber-400">#4</span>
+            </div>
+          </div>
+
+          <!-- 4 Core Rating Bars -->
+          <div id="franchiseCoreRatingsList" class="space-y-4">
+            <!-- Populated by JS -->
+          </div>
+
+          <!-- Active Tactical Scheme Selector -->
+          <div class="pt-4 border-t border-slate-800">
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                <i data-lucide="compass" class="w-4 h-4 text-sky-400"></i>
+                <span>Active Tactical System</span>
+              </label>
+              <span class="text-[11px] text-slate-400">Counter opponent weaknesses</span>
+            </div>
+            <div id="tacticalSchemeButtons" class="grid grid-cols-2 gap-2.5">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Tycoon Upgrades Store -->
+        <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-4">
+            <div>
+              <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Front Office Operations</span>
+              <h2 class="text-xl font-extrabold text-white mt-0.5">Tycoon Upgrades & Scouting Department</h2>
+              <p class="text-xs text-slate-400 mt-0.5">Invest prize money between rounds to permanently elevate franchise ratings, curb fatigue, and unlock opponent intel.</p>
+            </div>
+            <div class="bg-slate-950 border border-slate-800 px-3.5 py-2 rounded-xl text-right">
+              <span class="text-[10px] uppercase tracking-wider text-slate-400 block">War Chest</span>
+              <span id="upgradeStoreCash" class="text-base font-mono font-bold text-emerald-400">$250,000</span>
+            </div>
+          </div>
+
+          <!-- Upgrade Cards Grid -->
+          <div id="tycoonUpgradesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Starting Roster & Player Stats -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-5">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-indigo-400">Active Rotation</span>
+            <h3 class="text-lg font-bold text-white">Starting Five Roster & Tournament Averages</h3>
+          </div>
+          <div class="text-xs text-slate-400">
+            Training Camp upgrades automatically boost individual player offensive and defensive attributes.
+          </div>
+        </div>
+        <div id="franchiseRosterGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: LEAGUE STANDINGS & POWER RANKINGS -->
+    <section id="tabContent-standings" class="hidden space-y-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-sky-400">League Intelligence</span>
+            <h2 class="text-xl font-extrabold text-white mt-0.5">16-Team Power Rankings & Tournament Standings</h2>
+            <p class="text-xs text-slate-400 mt-1">Sorted by Composite Power Index (Offense, Defense, Win-Loss record, and Point Differential).</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="setStandingsSort('power')" id="sortBtn-power" class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition">Power Rank</button>
+            <button onclick="setStandingsSort('seed')" id="sortBtn-seed" class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition">Bracket Seed</button>
+            <button onclick="setStandingsSort('offense')" id="sortBtn-offense" class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition">Offense</button>
+            <button onclick="setStandingsSort('defense')" id="sortBtn-defense" class="px-3 py-1.5 rounded-lg text-xs font-semibold border transition">Defense</button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <th class="py-3 px-3">Pwr Rk</th>
+                <th class="py-3 px-3">Seed</th>
+                <th class="py-3 px-3">Franchise</th>
+                <th class="py-3 px-3">Status</th>
+                <th class="py-3 px-3">Style</th>
+                <th class="py-3 px-3 text-center">OFF</th>
+                <th class="py-3 px-3 text-center">DEF</th>
+                <th class="py-3 px-3 text-center">TEMPO</th>
+                <th class="py-3 px-3 text-center">FATIGUE</th>
+                <th class="py-3 px-3 text-center">W - L</th>
+                <th class="py-3 px-3 text-right">PT DIFF</th>
+              </tr>
+            </thead>
+            <tbody id="standingsTableBody" class="divide-y divide-slate-800/60 text-xs sm:text-sm">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MATCH MODAL (PRE-GAME PREVIEW, LIVE QUARTER TICKER & POST-GAME BOX SCORE) -->
+  <div id="matchModalBackdrop" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-4xl w-full shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="px-5 py-4 bg-slate-925 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <span id="modalMatchRoundBadge" class="text-xs font-mono uppercase px-2.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Round of 16</span>
+          <span id="modalMatchStatusBadge" class="text-xs font-semibold px-2.5 py-0.5 rounded bg-slate-800 text-slate-300">Match Preview</span>
+        </div>
+        <button id="modalCloseBtn" onclick="closeMatchModal()" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Dynamic Body -->
+      <div id="modalMatchBody" class="p-5 sm:p-6 overflow-y-auto space-y-6 flex-1">
+        <!-- Populated dynamically by JS -->
+      </div>
+
+      <!-- Modal Footer Actions -->
+      <div id="modalMatchFooter" class="px-5 py-4 bg-slate-925 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <!-- Populated dynamically by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- RESET CONFIRMATION MODAL -->
+  <div id="resetModalBackdrop" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center gap-3 text-rose-400">
+        <div class="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
+          <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h3 class="text-lg font-bold text-white">Reset All Franchise Data?</h3>
+          <p class="text-xs text-slate-400">This will clear your localStorage save and start a fresh Season 1 tournament.</p>
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button onclick="closeResetConfirmModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition">Cancel</button>
+        <button onclick="confirmFullReset()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition">Confirm Wipe & Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+  <!-- APPLICATION LOGIC -->
+  <script>
+    const STORAGE_KEY = 'APEX_HOOPS_TYCOON_SAVE_V1';
+
+    const ROUND_NAMES = [
+      'Round of 16',
+      'Quarterfinals',
+      'Semifinals',
+      'Championship'
+    ];
+
+    const ROUND_REWARDS = [150000, 250000, 400000, 800000];
+    const CONSOLATION_REWARD = 50000;
+
+    const TACTICAL_STYLES = [
+      {
+        id: 'PACE_SPACE',
+        name: 'Pace & Space',
+        desc: 'High-volume perimeter shooting and fast breaks.',
+        counters: 'GRIT_GRIND',
+        weakAgainst: 'SWITCH_PRESS'
+      },
+      {
+        id: 'GRIT_GRIND',
+        name: 'Grit & Grind',
+        desc: 'Physical interior post play and half-court clock control.',
+        counters: 'SWITCH_PRESS',
+        weakAgainst: 'PACE_SPACE'
+      },
+      {
+        id: 'SWITCH_PRESS',
+        name: 'Full-Court Press',
+        desc: 'Relentless ball pressure forcing turnovers and transition dunks.',
+        counters: 'PACE_SPACE',
+        weakAgainst: 'GRIT_GRIND'
+      },
+      {
+        id: 'BALANCED',
+        name: 'Balanced Motion',
+        desc: 'Adaptable read-and-react offense with disciplined help defense.',
+        counters: null,
+        weakAgainst: null
+      }
+    ];
+
+    const AI_FRANCHISE_TEMPLATES = [
+      { name: 'Metro Titans', seed: 1, off: 89, def: 88, tempo: 82, style: 'PACE_SPACE', color: '#f59e0b' },
+      { name: 'Harbor Sharks', seed: 2, off: 86, def: 89, tempo: 76, style: 'GRIT_GRIND', color: '#0ea5e9' },
+      { name: 'Solaris Suns', seed: 3, off: 88, def: 83, tempo: 90, style: 'PACE_SPACE', color: '#f97316' },
+      { name: 'Ironclad Forge', seed: 5, off: 80, def: 86, tempo: 70, style: 'GRIT_GRIND', color: '#64748b' },
+      { name: 'Neon Phantoms', seed: 6, off: 84, def: 79, tempo: 88, style: 'SWITCH_PRESS', color: '#a855f7' },
+      { name: 'Glacier Wolves', seed: 7, off: 81, def: 82, tempo: 75, style: 'BALANCED', color: '#38bdf8' },
+      { name: 'Crimson Monarchs', seed: 8, off: 80, def: 79, tempo: 80, style: 'BALANCED', color: '#f43f5e' },
+      { name: 'Canyon Coyotes', seed: 9, off: 79, def: 78, tempo: 83, style: 'SWITCH_PRESS', color: '#eab308' },
+      { name: 'Emerald Sentinels', seed: 10, off: 77, def: 80, tempo: 73, style: 'GRIT_GRIND', color: '#10b981' },
+      { name: 'Bayou Pelicans', seed: 11, off: 78, def: 75, tempo: 84, style: 'PACE_SPACE', color: '#14b8a6' },
+      { name: 'Summit Condors', seed: 12, off: 75, def: 77, tempo: 78, style: 'BALANCED', color: '#6366f1' },
+      { name: 'Obsidian Knights', seed: 13, off: 73, def: 76, tempo: 72, style: 'GRIT_GRIND', color: '#94a3b8' },
+      { name: 'Vortex Strikers', seed: 14, off: 76, def: 71, tempo: 89, style: 'PACE_SPACE', color: '#ec4899' },
+      { name: 'Dune Scorpions', seed: 15, off: 72, def: 72, tempo: 79, style: 'SWITCH_PRESS', color: '#d97706' },
+      { name: 'Cobalt Comets', seed: 16, off: 70, def: 71, tempo: 76, style: 'BALANCED', color: '#3b82f6' }
+    ];
+
+    const FIRST_NAMES = ['Marcus', 'Jalen', 'Devon', 'Kobe', 'Tyrese', 'Luka', 'Xavier', 'Darius', 'Malik', 'Caleb', 'Zayden', 'Kendrick', 'Trey', 'Donovan', 'Andre', 'roman', 'Isaiah', 'Desmond', 'Keegan', 'Miles'];
+    const LAST_NAMES = ['Vance', 'Sterling', 'Mercer', 'Callahan', 'Thornton', 'Kovacs', 'Rivers', 'Bellinger', 'Lennox', 'Hawkins', 'Porter', 'Galloway', 'Bridges', 'Maddox', 'Sinclair', 'Cunningham', 'flash', 'Barrett', 'Vaughn', 'pris'];
+    const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
+
+    // Standard 16-seed bracket pairing order so #1 meets #16, #8 meets #9, etc.
+    const SEED_PAIRINGS = [
+      [1, 16],
+      [8, 9],
+      [5, 12],
+      [4, 13],
+      [6, 11],
+      [3, 14],
+      [7, 10],
+      [2, 15]
+    ];
+
+    let state = null;
+    let activeTab = 'bracket';
+    let standingsSortBy = 'power';
+    let activeModalMatchId = null;
+    let liveSimTimer = null;
+    let liveSimState = null;
+
+    // Helper: Format Currency
+    function formatCash(amount) {
+      return '$' + Math.round(amount).toLocaleString('en-US');
+    }
+
+    // Helper: Clamp value
+    function clamp(val, min, max) {
+      return Math.max(min, Math.min(max, val));
+    }
+
+    // Helper: Get Style Info
+    function getStyleObj(styleId) {
+      return TACTICAL_STYLES.find(s => s.id === styleId) || TACTICAL_STYLES[3];
+    }
+
+    // Generate 5 starters for a team
+    function generateRoster(teamOff, teamDef, isUser = false) {
+      const defaultUserNames = [
+        'Jalen Vance',
+        'Tyrese Mercer',
+        'Xavier Bridges',
+        'Darius Vance',
+        'Malik Thornton'
+      ];
+      return POSITIONS.map((pos, idx) => {
+        const fname = FIRST_NAMES[(idx * 3 + teamOff) % FIRST_NAMES.length];
+        const lname = LAST_NAMES[(idx * 5 + teamDef) % LAST_NAMES.length];
+        const cleanFirst = fname.charAt(0).toUpperCase() + fname.slice(1);
+        const cleanLast = lname.charAt(0).toUpperCase() + lname.slice(1);
+        const name = isUser ? defaultUserNames[idx] : `${cleanFirst} ${cleanLast}`;
+        const off = clamp(teamOff + Math.floor(Math.sin(idx + teamOff) * 5), 60, 99);
+        const def = clamp(teamDef + Math.floor(Math.cos(idx + teamDef) * 5), 60, 99);
+        return {
+          id: `p_${pos}_${ idx }_${Math.random().toString(36).substring(2, 6)}`,
+          name,
+          pos,
+          off,
+          def,
+          games: 0,
+          pts: 0,
+          reb: 0,
+          ast: 0
+        };
+      });
+    }
+
+    // Initialize Default State
+    function createInitialState() {
+      const userTeam = {
+        id: 'team_user',
+        name: 'Apex Vipers',
+        isUser: true,
+        seed: 4,
+        offense: 83,
+        defense: 82,
+        tempo: 84,
+        fatigue: 0,
+        style: 'PACE_SPACE',
+        color: '#10b981',
+        wins: 0,
+        losses: 0,
+        ptsFor: 0,
+        ptsAgainst: 0,
+        eliminated: false,
+        roster: generateRoster(83, 82, true)
+      };
+
+      const aiTeams = AI_FRANCHISE_TEMPLATES.map((tpl, idx) => ({
+        id: `team_ai_${idx + 1}`,
+        name: tpl.name,
+        isUser: false,
+        seed: tpl.seed,
+        offense: tpl.off,
+        defense: tpl.def,
+        tempo: tpl.tempo,
+        fatigue: 0,
+        style: tpl.style,
+        color: tpl.color,
+        wins: 0,
+        losses: 0,
+        ptsFor: 0,
+        ptsAgainst: 0,
+        eliminated: false,
+        roster: generateRoster(tpl.off, tpl.def, false)
+      }));
+
+      const allTeams = [userTeam, ...aiTeams];
+
+      const newState = {
+        season: 1,
+        cash: 250000,
+        allTimeWins: 0,
+        allTimeLosses: 0,
+        championships: 0,
+        currentRound: 0, // 0=R16, 1=QF, 2=SF, 3=Final
+        tournamentComplete: false,
+        championTeamId: null,
+        upgrades: {
+          trainingCampLevel: 1,
+          sportsScienceLevel: 1,
+          scoutingActiveForRound: -1 // matches currentRound when bought
+        },
+        teams: allTeams,
+        bracket: [[], [], [], []]
+      };
+
+      buildTournamentBracket(newState);
+      return newState;
+    }
+
+    // Build 16-team bracket rounds
+    function buildTournamentBracket(targetState) {
+      const bySeed = {};
+      targetState.teams.forEach(t => {
+        t.eliminated = false;
+        bySeed[t.seed] = t.id;
+      });
+
+      // Round 0: Round of 16 (8 matches)
+      const r0 = SEED_PAIRINGS.map((pair, idx) => ({
+        id: `r0_m${idx}`,
+        round: 0,
+        slot: idx,
+        teamAId: bySeed[pair[0]],
+        teamBId: bySeed[pair[1]],
+        status: 'scheduled', // 'scheduled' | 'completed'
+        scoreA: null,
+        scoreB: null,
+        winnerId: null,
+        boxScore: null
+      }));
+
+      // Round 1: Quarterfinals (4 matches)
+      const r1 = Array.from({ length: 4 }, (_, idx) => ({
+        id: `r1_m${idx}`,
+        round: 1,
+        slot: idx,
+        teamAId: null,
+        teamBId: null,
+        status: 'scheduled',
+        scoreA: null,
+        scoreB: null,
+        winnerId: null,
+        boxScore: null
+      }));
+
+      // Round 2: Semifinals (2 matches)
+      const r2 = Array.from({ length: 2 }, (_, idx) => ({
+        id: `r2_m${idx}`,
+        round: 2,
+        slot: idx,
+        teamAId: null,
+        teamBId: null,
+        status: 'scheduled',
+        scoreA: null,
+        scoreB: null,
+        winnerId: null,
+        boxScore: null
+      }));
+
+      // Round 3: Championship (1 match)
+      const r3 = [{
+        id: `r3_m0`,
+        round: 3,
+        slot: 0,
+        teamAId: null,
+        teamBId: null,
+        status: 'scheduled',
+        scoreA: null,
+        scoreB: null,
+        winnerId: null,
+        boxScore: null
+      }];
+
+      targetState.bracket = [r0, r1, r2, r3];
+      targetState.currentRound = 0;
+      targetState.tournamentComplete = false;
+      targetState.championTeamId = null;
+    }
+
+    // Load or Initialize State
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.teams) && Array.isArray(parsed.bracket)) {
+            state = parsed;
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Could not parse saved state, initializing fresh state.', e);
+      }
+      state = createInitialState();
+      saveState();
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {
+        console.error('Failed to persist state to localStorage:', e);
+      }
+    }
+
+    // Lookup Helpers
+    function getTeam(teamId) {
+      return state.teams.find(t => t.id === teamId) || null;
+    }
+
+    function getUserTeam() {
+      return state.teams.find(t => t.isUser);
+    }
+
+    function getMatchById(matchId) {
+      for (const r of state.bracket) {
+        for (const m of r) {
+          if (m.id === matchId) return m;
+        }
+      }
+      return null;
+    }
+
+    function getTeamOVR(team) {
+      if (!team) return 0;
+      const raw = (team.offense * 0.45) + (team.defense * 0.45) + (team.tempo * 0.10);
+      return Math.round(raw);
+    }
+
+    function getEffectiveRating(team) {
+      // Fatigue penalty: up to -18 points at 100% fatigue
+      const fatiguePenalty = (team.fatigue / 100) * 18;
+      return {
+        effOff: Math.max(50, team.offense - fatiguePenalty),
+        effDef: Math.max(50, team.defense - fatiguePenalty),
+        fatiguePenalty: Math.round(fatiguePenalty * 10) / 10
+      };
+    }
+
+    function isScoutingActiveForMatch(match) {
+      if (!match) return false;
+      const user = getUserTeam();
+      const involvesUser = match.teamAId === user.id || match.teamBId === user.id;
+      return involvesUser && state.upgrades.scoutingActiveForRound === match.round;
+    }
+
+    // Calculate pre-match win probability for Team A vs Team B
+    function calculateMatchupOdds(teamA, teamB, matchObj = null) {
+      if (!teamA || !teamB) return { probA: 50, probB: 50, tacticalEdgeA: 0, scoutBoostA: 0, scoutBoostB: 0 };
+
+      const effA = getEffectiveRating(teamA);
+      const effB = getEffectiveRating(teamB);
+
+      const netA = (effA.effOff + effA.effDef) / 2;
+      const netB = (effB.effOff + effB.effDef) / 2;
+
+      // Tactical Counter Bonus
+      const styleA = getStyleObj(teamA.style);
+      const styleB = getStyleObj(teamB.style);
+      let tacticalEdgeA = 0;
+      if (styleA.counters === teamB.style) tacticalEdgeA = 4;
+      if (styleB.counters === teamA.style) tacticalEdgeA = -4;
+
+      const diff = (netA - netB) + tacticalEdgeA;
+      // Logistic curve for baseline probability
+      let probA = 100 / (1 + Math.exp(-diff * 0.14));
+
+      let scoutBoostA = 0;
+      let scoutBoostB = 0;
+
+      if (matchObj && isScoutingActiveForMatch(matchObj)) {
+        if (teamA.isUser) {
+          probA += 10;
+          scoutBoostA = 10;
+        } else if (teamB.isUser) {
+          probA -= 10;
+          scoutBoostB = 10;
+        }
+      }
+
+      probA = clamp(Math.round(probA), 8, 92);
+      return {
+        probA,
+        probB: 100 - probA,
+        tacticalEdgeA,
+        scoutBoostA,
+        scoutBoostB
+      };
+    }
+
+    // Core Match Simulation Engine (produces quarter-by-quarter events & box score)
+    function generateMatchSimulationData(match) {
+      const teamA = getTeam(match.teamAId);
+      const teamB = getTeam(match.teamBId);
+      const odds = calculateMatchupOdds(teamA, teamB, match);
+
+      const effA = getEffectiveRating(teamA);
+      const effB = getEffectiveRating(teamB);
+
+      // Pace determines possessions per quarter
+      const avgTempo = (teamA.tempo + teamB.tempo) / 2;
+      const paceFactor = 0.88 + (avgTempo / 100) * 0.28; // ~0.95 to 1.16
+
+      // Quarter-by-quarter scores
+      const quartersA = [];
+      const quartersB = [];
+      const events = [];
+
+      let totalA = 0;
+      let totalB = 0;
+
+      // Determine expected edge per quarter from odds.probA
+      // Centered at 50%: a +10% prob boost shifts expected points per quarter by ~1.4 pts
+      const probEdgeA = (odds.probA - 50) * 0.11;
+
+      for (let q = 1; q <= 4; q++) {
+        // Fatigue hits harder in Q3 & Q4
+        const lateGameFatigueDragA = q >= 3 ? (teamA.fatigue / 100) * 2.2 : 0;
+        const lateGameFatigueDragB = q >= 3 ? (teamB.fatigue / 100) * 2.2 : 0;
+
+        const basePtsA = 24 * paceFactor + ((effA.effOff - effB.effDef) * 0.22) + (probEdgeA / 2) - lateGameFatigueDragA;
+        const basePtsB = 24 * paceFactor + ((effB.effOff - effA.effDef) * 0.22) - (probEdgeA / 2) - lateGameFatigueDragB;
+
+        const noiseA = (Math.random() - 0.5) * 9;
+        const noiseB = (Math.random() - 0.5) * 9;
+
+        const qScoreA = clamp(Math.round(basePtsA + noiseA), 14, 42);
+        const qScoreB = clamp(Math.round(basePtsB + noiseB), 14, 42);
+
+        quartersA.push(qScoreA);
+        quartersB.push(qScoreB);
+        totalA += qScoreA;
+        totalB += qScoreB;
+
+        // Generate 3 key events for this quarter
+        const starA = teamA.roster[Math.floor(Math.random() * 3)];
+        const starB = teamB.roster[Math.floor(Math.random() * 3)];
+        const defA = teamA.roster[3 + Math.floor(Math.random() * 2)];
+        const defB = teamB.roster[3 + Math.floor(Math.random() * 2)];
+
+        const clockEarly = `${9 + Math.floor(Math.random() * 2)}:${String(10 + Math.floor(Math.random() * 49)).padStart(2, '0')}`;
+        const clockMid = `${5 + Math.floor(Math.random() * 3)}:${String(10 + Math.floor(Math.random() * 49)).padStart(2, '0')}`;
+        const clockLate = `0:${String(12 + Math.floor(Math.random() * 45)).padStart(2, '0')}`;
+
+        if (qScoreA >= qScoreB) {
+          events.push({
+            quarter: `Q${q}`,
+            clock: clockEarly,
+            teamId: teamA.id,
+            teamName: teamA.name,
+            type: 'HIGHLIGHT',
+            text: `${starA.name} (${starA.pos}) drills a step-back three in transition to ignite a ${teamA.name} run.`
+          });
+          events.push({
+            quarter: `Q${q}`,
+            clock: clockMid,
+            teamId: teamB.id,
+            teamName: teamB.name,
+            type: 'TURNOVER',
+            text: `${defA.name} jumps the passing lane and forces a costly ${teamB.name} turnover.`
+          });
+        } else {
+          events.push({
+            quarter: `Q${q}`,
+            clock: clockEarly,
+            teamId: teamB.id,
+            teamName: teamB.name,
+            type: 'HIGHLIGHT',
+            text: `${starB.name} (${starB.pos}) attacks the paint for an explosive and-one finish.`
+          });
+          events.push({
+            quarter: `Q${q}`,
+            clock: clockMid,
+            teamId: teamA.id,
+            teamName: teamA.name,
+            type: 'FOUL',
+            text: `Physical interior pressure forces ${defA.name} into foul trouble in the bonus.`
+          });
+        }
+
+        // End of quarter clutch play
+        const clutchTeam = Math.random() * 100 < odds.probA ? teamA : teamB;
+        const clutchStar = clutchTeam.roster[Math.floor(Math.random() * 2)];
+        events.push({
+          quarter: `Q${q}`,
+          clock: clockLate,
+          teamId: clutchTeam.id,
+          teamName: clutchTeam.name,
+          type: 'CLUTCH',
+          text: `${clutchStar.name} beats the ${q === 4 ? 'fourth-quarter' : 'quarter'} buzzer with a contested pull-up jumper!`
+        });
+      }
+
+      // Overtime resolution if tied after Q4
+      let isOT = false;
+      if (totalA === totalB) {
+        isOT = true;
+        const aWinsOT = (Math.random() * 100) < odds.probA;
+        const otLoser = 8 + Math.floor(Math.random() * 6);
+        const otWinner = otLoser + 2 + Math.floor(Math.random() * 5);
+        const otA = aWinsOT ? otWinner : otLoser;
+        const otB = aWinsOT ? otLoser : otWinner;
+        quartersA.push(otA);
+        quartersB.push(otB);
+        totalA += otA;
+        totalB += otB;
+
+        const winTeam = aWinsOT ? teamA : teamB;
+        events.push({
+          quarter: 'OT',
+          clock: '0:03',
+          teamId: winTeam.id,
+          teamName: winTeam.name,
+          type: 'CLUTCH',
+          text: `${winTeam.roster[0].name} sinks a cold-blooded dagger in Overtime to seal the victory!`
+        });
+      }
+
+      const winnerTeam = totalA > totalB ? teamA : teamB;
+      const loserTeam = totalA > totalB ? teamB : teamA;
+      const winnerScore = Math.max(totalA, totalB);
+
+      // Generate Individual Player Box Scores & Top Performer
+      const playerStatsA = distributePlayerStats(teamA, totalA);
+      const playerStatsB = distributePlayerStats(teamB, totalB);
+
+      const winPool = totalA > totalB ? playerStatsA : playerStatsB;
+      const topPerformer = [...winPool].sort((a, b) => (b.pts + b.reb * 1.2 + b.ast * 1.5) - (a.pts + a.reb * 1.2 + a.ast * 1.5))[0];
+
+      // Team Box Metrics
+      const fgPctA = clamp(Math.round(43 + (effA.effOff - effB.effDef) * 0.35 + (Math.random() - 0.5) * 5), 36, 61);
+      const fgPctB = clamp(Math.round(43 + (effB.effOff - effA.effDef) * 0.35 + (Math.random() - 0.5) * 5), 36, 61);
+      const tovA = clamp(Math.round(12 + (teamA.fatigue / 15) - (effA.effOff - 75) * 0.15 + (Math.random() - 0.5) * 4), 5, 22);
+      const tovB = clamp(Math.round(12 + (teamB.fatigue / 15) - (effB.effOff - 75) * 0.15 + (Math.random() - 0.5) * 4), 5, 22);
+
+      return {
+        teamAId: teamA.id,
+        teamBId: teamB.id,
+        scoreA: totalA,
+        scoreB: totalB,
+        winnerId: winnerTeam.id,
+        loserId: loserTeam.id,
+        quartersA,
+        quartersB,
+        isOT,
+        fgPctA,
+        fgPctB,
+        tovA,
+        tovB,
+        playerStatsA,
+        playerStatsB,
+        topPerformer: {
+          ...topPerformer,
+          teamName: winnerTeam.name,
+          teamColor: winnerTeam.color
+        },
+        events,
+        scoutUsed: isScoutingActiveForMatch(match),
+        cashAwarded: 0
+      };
+    }
+
+    function distributePlayerStats(team, totalPoints) {
+      // Weights for scoring across starters
+      const weights = team.roster.map((p, i) => Math.pow(p.off / 70, 2) * (i < 2 ? 1.25 : 0.9));
+      const sumW = weights.reduce((a, b) => a + b, 0);
+
+      // Starters account for ~84% of team points, bench the rest
+      const starterPool = Math.round(totalPoints * 0.85);
+      let allocated = 0;
+
+      return team.roster.map((p, idx) => {
+        let pts = idx === 4
+          ? Math.max(4, starterPool - allocated)
+          : Math.max(4, Math.round((weights[idx] / sumW) * starterPool + (Math.random() - 0.5) * 4));
+        allocated += pts;
+
+        const isBig = p.pos === 'PF' || p.pos === 'C';
+        const isGuard = p.pos === 'PG' || p.pos === 'SG';
+        const reb = clamp(Math.round((isBig ? 8 : 3.5) + (p.def - 75) * 0.12 + Math.random() * 4), 1, 18);
+        const ast = clamp(Math.round((isGuard ? 6 : 2) + (p.off - 75) * 0.1 + Math.random() * 3), 0, 15);
+
+        return {
+          playerId: p.id,
+          name: p.name,
+          pos: p.pos,
+          pts,
+          reb,
+          ast
+        };
+      });
+    }
+
+    // Commit Simulation Result to State & Advance Winner
+    function commitMatchResult(match, simResult) {
+      if (match.status === 'completed') return;
+
+      match.status = 'completed';
+      match.scoreA = simResult.scoreA;
+      match.scoreB = simResult.scoreB;
+      match.winnerId = simResult.winnerId;
+      match.boxScore = simResult;
+
+      const teamA = getTeam(match.teamAId);
+      const teamB = getTeam(match.teamBId);
+      const winner = getTeam(simResult.winnerId);
+      const loser = getTeam(simResult.loserId);
+
+      // Update records & points
+      teamA.ptsFor += simResult.scoreA;
+      teamA.ptsAgainst += simResult.scoreB;
+      teamB.ptsFor += simResult.scoreB;
+      teamB.ptsAgainst += simResult.scoreA;
+
+      winner.wins += 1;
+      loser.losses += 1;
+      loser.eliminated = true;
+
+      // Update cumulative player stats
+      simResult.playerStatsA.forEach(ps => {
+        const p = teamA.roster.find(r => r.id === ps.playerId);
+        if (p) {
+          p.games += 1;
+          p.pts += ps.pts;
+          p.reb += ps.reb;
+          p.ast += ps.ast;
+        }
+      });
+      simResult.playerStatsB.forEach(ps => {
+        const p = teamB.roster.find(r => r.id === ps.playerId);
+        if (p) {
+          p.games += 1;
+          p.pts += ps.pts;
+          p.reb += ps.reb;
+          p.ast += ps.ast;
+        }
+      });
+
+      // Accumulate Fatigue
+      // Base fatigue gain is 18-24%. Sports Science reduces user fatigue gain by 22% per level
+      [teamA, teamB].forEach(t => {
+        const baseFatigue = 18 + Math.round((t.tempo / 100) * 6);
+        if (t.isUser) {
+          const reductionMultiplier = Math.max(0.25, 1 - (state.upgrades.sportsScienceLevel - 1) * 0.20);
+          const added = Math.round(baseFatigue * reductionMultiplier);
+          t.fatigue = clamp(t.fatigue + added, 0, 100);
+        } else {
+          t.fatigue = clamp(t.fatigue + baseFatigue - 4, 0, 100);
+        }
+      });
+
+      // Handle User Franchise Economy & All-time Record
+      if (teamA.isUser || teamB.isUser) {
+        if (winner.isUser) {
+          const prize = ROUND_REWARDS[match.round];
+          state.cash += prize;
+          state.allTimeWins += 1;
+          simResult.cashAwarded = prize;
+          showToast(`Victory! Earned ${formatCash(prize)} for advancing!`, 'emerald');
+        } else {
+          state.cash += CONSOLATION_REWARD;
+          state.allTimeLosses += 1;
+          simResult.cashAwarded = CONSOLATION_REWARD;
+          showToast(`Eliminated. Received ${formatCash(CONSOLATION_REWARD)} gate revenue.`, 'amber');
+        }
+      }
+
+      // Advance Winner to Next Round Slot
+      if (match.round < 3) {
+        const nextRoundIdx = match.round + 1;
+        const nextMatchSlot = Math.floor(match.slot / 2);
+        const isTopSlot = (match.slot % 2) === 0;
+        const nextMatch = state.bracket[nextRoundIdx][nextMatchSlot];
+        if (nextMatch) {
+          if (isTopSlot) {
+            nextMatch.teamAId = winner.id;
+          } else {
+            nextMatch.teamBId = winner.id;
+          }
+        }
+      } else {
+        // Championship Match Completed!
+        state.tournamentComplete = true;
+        state.championTeamId = winner.id;
+        if (winner.isUser) {
+          state.championships += 1;
+          triggerChampionshipConfetti();
+        }
+      }
+
+      // Check if entire currentRound is now completed
+      const currentRoundMatches = state.bracket[state.currentRound];
+      if (currentRoundMatches && currentRoundMatches.every(m => m.status === 'completed')) {
+        if (state.currentRound < 3) {
+          state.currentRound += 1;
+          // Between-round passive recovery from Sports Science Facility
+          const user = getUserTeam();
+          const passiveHeal = 4 + state.upgrades.sportsScienceLevel * 4;
+          user.fatigue = clamp(user.fatigue - passiveHeal, 0, 100);
+        }
+      }
+
+      saveState();
+      renderAll();
+    }
+
+    function triggerChampionshipConfetti() {
+      if (typeof confetti === 'function') {
+        confetti({
+          particleCount: 110,
+          spread: 80,
+          origin: { y: 0.6 }
+        });
+        setTimeout(() => {
+          confetti({
+            particleCount: 80,
+            angle: 60,
+            spread: 65,
+            origin: { x: 0 }
+          });
+          confetti({
+            particleCount: 80,
+            angle: 120,
+            spread: 65,
+            origin: { x: 1 }
+          });
+        }, 350);
+      }
+    }
+
+    // Simulate all remaining AI vs AI matches in the active round
+    function simRemainingMatchesInCurrentRound(includeUser = false) {
+      const roundMatches = state.bracket[state.currentRound];
+      if (!roundMatches) return;
+
+      let count = 0;
+      roundMatches.forEach(m => {
+        if (m.status === 'scheduled' && m.teamAId && m.teamBId) {
+          const involvesUser = m.teamAId === 'team_user' || m.teamBId === 'team_user';
+          if (!involvesUser || includeUser) {
+            const simData = generateMatchSimulationData(m);
+            commitMatchResult(m, simData);
+            count++;
+          }
+        }
+      });
+
+      if (count > 0) {
+        showToast(`Simulated ${count} tournament matchup${count > 1 ? 's' : ''}.`, 'sky');
+      }
+      renderAll();
+    }
+
+    // Start Next Season Tournament (preserving user franchise upgrades, cash, and history)
+    function startNextSeasonTournament() {
+      state.season += 1;
+      state.upgrades.scoutingActiveForRound = -1;
+
+      // Reset tournament stats and slightly evolve AI teams
+      state.teams.forEach(t => {
+        t.wins = 0;
+        t.losses = 0;
+        t.ptsFor = 0;
+        t.ptsAgainst = 0;
+        t.fatigue = 0;
+        t.eliminated = false;
+        t.roster.forEach(p => {
+          p.games = 0;
+          p.pts = 0;
+          p.reb = 0;
+          p.ast = 0;
+        });
+        if (!t.isUser) {
+          // Slight seasonal progression so each season feels dynamic
+          t.offense = clamp(t.offense + Math.floor((Math.random() - 0.45) * 4), 68, 96);
+          t.defense = clamp(t.defense + Math.floor((Math.random() - 0.45) * 4), 68, 96);
+        }
+      });
+
+      // Re-seed based on OVR
+      const sortedByOVR = [...state.teams].sort((a, b) => getTeamOVR(b) - getTeamOVR(a));
+      sortedByOVR.forEach((t, idx) => {
+        t.seed = idx + 1;
+      });
+
+      buildTournamentBracket(state);
+      saveState();
+      renderAll();
+      showToast(`Season ${state.season} Tournament Bracket Initialized!`, 'emerald');
+    }
+
+    // Tycoon Upgrades Logic
+    function getUpgradeCosts() {
+      const tcLvl = state.upgrades.trainingCampLevel;
+      const ssLvl = state.upgrades.sportsScienceLevel;
+      return {
+        trainingCampCost: 120000 + (tcLvl - 1) * 75000,
+        sportsScienceCost: 100000 + (ssLvl - 1) * 65000,
+        scoutingCost: 75000,
+        recoverySessionCost: 60000
+      };
+    }
+
+    function buyTrainingCampUpgrade() {
+      const { trainingCampCost } = getUpgradeCosts();
+      const user = getUserTeam();
+      if (state.cash < trainingCampCost) {
+        showToast('Insufficient funds for Training Camp upgrade.', 'rose');
+        return;
+      }
+      if (user.offense >= 99 && user.defense >= 99) {
+        showToast('Offense and Defense are already at maximum (99)!', 'amber');
+        return;
+      }
+
+      state.cash -= trainingCampCost;
+      state.upgrades.trainingCampLevel += 1;
+      user.offense = clamp(user.offense + 3, 1, 99);
+      user.defense = clamp(user.defense + 3, 1, 99);
+      user.tempo = clamp(user.tempo + 1, 1, 99);
+
+      user.roster.forEach(p => {
+        p.off = clamp(p.off + 3, 1, 99);
+        p.def = clamp(p.def + 3, 1, 99);
+      });
+
+      saveState();
+      renderAll();
+      showToast(`Training Camp Lv.${state.upgrades.trainingCampLevel}: +3 OFF, +3 DEF!`, 'emerald');
+    }
+
+    function buySportsScienceUpgrade() {
+      const { sportsScienceCost } = getUpgradeCosts();
+      const user = getUserTeam();
+      if (state.cash < sportsScienceCost) {
+        showToast('Insufficient funds for Sports Science Facility.', 'rose');
+        return;
+      }
+      if (state.upgrades.sportsScienceLevel >= 5) {
+        showToast('Sports Science Facility is at Max Level (Lv.5)!', 'amber');
+        return;
+      }
+
+      state.cash -= sportsScienceCost;
+      state.upgrades.sportsScienceLevel += 1;
+      user.fatigue = clamp(user.fatigue - 25, 0, 100);
+
+      saveState();
+      renderAll();
+      showToast(`Sports Science Lv.${state.upgrades.sportsScienceLevel} unlocked! Fatigue reduced.`, 'emerald');
+    }
+
+    function buyScoutingReport() {
+      const { scoutingCost } = getUpgradeCosts();
+      const nextMatch = getUserNextScheduledMatch();
+      if (!nextMatch) {
+        showToast('No scheduled tournament match available to scout.', 'amber');
+        return;
+      }
+      if (state.upgrades.scoutingActiveForRound === nextMatch.round) {
+        showToast('Scouting Report is already active for this round!', 'sky');
+        return;
+      }
+      if (state.cash < scoutingCost) {
+        showToast('Insufficient funds for Scouting Report.', 'rose');
+        return;
+      }
+
+      state.cash -= scoutingCost;
+      state.upgrades.scoutingActiveForRound = nextMatch.round;
+      saveState();
+      renderAll();
+      showToast('Scouting Report Purchased! +10% Win Probability & Tactical Intel Unlocked.', 'amber');
+    }
+
+    function buyCryoRecoverySession() {
+      const { recoverySessionCost } = getUpgradeCosts();
+      const user = getUserTeam();
+      if (user.fatigue === 0) {
+        showToast('Roster is already at 0% fatigue and peak conditioning!', 'sky');
+        return;
+      }
+      if (state.cash < recoverySessionCost) {
+        showToast('Insufficient funds for Cryo Recovery Session.', 'rose');
+        return;
+      }
+
+      state.cash -= recoverySessionCost;
+      user.fatigue = clamp(user.fatigue - 35, 0, 100);
+      saveState();
+      renderAll();
+      showToast('Cryo Recovery complete! Roster fatigue dropped by 35%.', 'emerald');
+    }
+
+    function setUserTacticalStyle(styleId) {
+      const user = getUserTeam();
+      user.style = styleId;
+      saveState();
+      renderAll();
+      const st = getStyleObj(styleId);
+      showToast(`Tactical Scheme updated to ${st.name}.`, 'sky');
+    }
+
+    function promptRenameFranchise() {
+      const user = getUserTeam();
+      const nextName = window.prompt('Enter your Franchise Name:', user.name);
+      if (nextName && nextName.trim().length >= 2) {
+        user.name = nextName.trim().slice(0, 26);
+        saveState();
+        renderAll();
+        showToast(`Franchise rebranded to ${user.name}!`, 'emerald');
+      }
+    }
+
+    // Find the user's current scheduled or most recent match
+    function getUserNextScheduledMatch() {
+      const user = getUserTeam();
+      for (const roundArr of state.bracket) {
+        for (const m of roundArr) {
+          if (m.status === 'scheduled' && (m.teamAId === user.id || m.teamBId === user.id)) {
+            return m;
+          }
+        }
+      }
+      return null;
+    }
+
+    // UI Tab Switching
+    function switchTab(tabId) {
+      activeTab = tabId;
+      ['bracket', 'franchise', 'standings'].forEach(t => {
+        const section = document.getElementById(`tabContent-${t}`);
+        const btn = document.getElementById(`tabBtn-${t}`);
+        if (t === tabId) {
+          section.classList.remove('hidden');
+          btn.className = 'tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 transition whitespace-nowrap bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
+        } else {
+          section.classList.add('hidden');
+          btn.className = 'tab-btn px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold flex items-center gap-2 transition whitespace-nowrap text-slate-400 hover:text-slate-200 hover:bg-slate-900';
+        }
+      });
+      renderAll();
+    }
+
+    // Master Render Function
+    function renderAll() {
+      renderHeader();
+      renderBracketTab();
+      renderFranchiseTab();
+      renderStandingsTab();
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    }
+
+    function renderHeader() {
+      const user = getUserTeam();
+      document.getElementById('headerFranchiseName').textContent = user.name;
+      document.getElementById('headerSeasonBadge').textContent = `Season ${state.season}`;
+      document.getElementById('headerCash').textContent = formatCash(state.cash);
+      document.getElementById('headerRecord').innerHTML = `${state.allTimeWins}W - ${state.allTimeLosses}L <span class="text-xs text-amber-400 font-normal">(${state.championships} ${state.championships === 1 ? 'Title' : 'Titles'})</span>`;
+      document.getElementById('headerOVR').textContent = getTeamOVR(user);
+
+      const fatEl = document.getElementById('headerFatigue');
+      fatEl.textContent = `${user.fatigue}%`;
+      fatEl.className = `text-sm font-mono font-bold ${user.fatigue > 45 ? 'text-rose-400' : user.fatigue > 20 ? 'text-amber-400' : 'text-emerald-400'}`;
+
+      const stageText = state.tournamentComplete
+        ? `Tournament Complete • Champion: ${getTeam(state.championTeamId)?.name || ''}`
+        : `${ROUND_NAMES[state.currentRound]} Active`;
+      document.getElementById('headerCurrentStageText').textContent = stageText;
+    }
+
+    function renderBracketTab() {
+      const user = getUserTeam();
+      const nextUserMatch = getUserNextScheduledMatch();
+      const cardEl = document.getElementById('userNextMatchCard');
+
+      // Update Round Status Panel
+      document.getElementById('roundProgressBadge').textContent = state.tournamentComplete
+        ? 'Season Complete'
+        : `Round ${state.currentRound + 1} of 4`;
+      document.getElementById('roundTitleDisplay').textContent = state.tournamentComplete
+        ? 'Championship Decided'
+        : ROUND_NAMES[state.currentRound];
+
+      // Global Bracket Action Buttons
+      const actionsContainer = document.getElementById('bracketGlobalActions');
+      const currentRoundMatches = state.bracket[state.currentRound] || [];
+      const pendingAIMatches = currentRoundMatches.filter(m => m.status === 'scheduled' && m.teamAId && m.teamBId && m.teamAId !== user.id && m.teamBId !== user.id);
+
+      if (state.tournamentComplete) {
+        actionsContainer.innerHTML = `
+          <button onclick="startNextSeasonTournament()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/50 transition">
+            <i data-lucide="play" class="w-4 h-4"></i>
+            <span>Launch Season ${state.season + 1} Tournament</span>
+          </button>
+        `;
+      } else {
+        actionsContainer.innerHTML = `
+          ${pendingAIMatches.length > 0 ? `
+            <button onclick="simRemainingMatchesInCurrentRound(false)" class="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center justify-center gap-2 transition shadow">
+              <i data-lucide="fast-forward" class="w-4 h-4"></i>
+              <span>Instant Sim ${pendingAIMatches.length} AI Match${pendingAIMatches.length > 1 ? 'es' : ''} in Round</span>
+            </button>
+          ` : ''}
+          ${user.eliminated && !state.tournamentComplete ? `
+            <button onclick="simRemainingMatchesInCurrentRound(true)" class="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition">
+              <i data-lucide="zap" class="w-4 h-4"></i>
+              <span>Sim Rest of Round</span>
+            </button>
+          ` : ''}
+          <button onclick="switchTab('franchise')" class="w-full py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center justify-center gap-2 border border-slate-700 transition">
+            <i data-lucide="wrench" class="w-3.5 h-3.5 text-amber-400"></i>
+            <span>Upgrades & Training Store</span>
+          </button>
+        `;
+      }
+
+      // Render User Matchup Spotlight Card
+      if (state.tournamentComplete) {
+        const champ = getTeam(state.championTeamId);
+        const isUserChamp = champ && champ.isUser;
+        cardEl.innerHTML = `
+          <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div class="space-y-2">
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold ${isUserChamp ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-slate-800 text-slate-300'}">
+                <i data-lucide="crown" class="w-4 h-4"></i>
+                <span>Season ${state.season} Tournament Complete</span>
+              </div>
+              <h2 class="text-2xl sm:text-3xl font-extrabold text-white">
+                ${isUserChamp ? `${user.name} Are League Champions!` : `${champ.name} Claim the Season${state.season} Title`}
+              </h2>
+              <p class="text-xs sm:text-sm text-slate-400 max-w-xl">
+                ${isUserChamp
+                  ? 'Your front-office upgrades and tactical adjustments paid off with the ultimate championship trophy. Your ratings and funds carry over into the next season!'
+                  : 'Your tournament run ended short of the trophy, but your franchise keeps all facility upgrades and cash reserves for next season.'}
+              </p>
+            </div>
+            <div class="flex flex-wrap gap-3">
+              <button onclick="openMatchModal('r3_m0')" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center gap-2 transition">
+                <i data-lucide="file-text" class="w-4 h-4"></i>
+                <span>View Championship Box Score</span>
+              </button>
+              <button onclick="startNextSeasonTournament()" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm flex items-center gap-2 transition">
+                <i data-lucide="arrow-right-circle" class="w-4 h-4"></i>
+                <span>Start Season ${state.season + 1}</span>
+              </button>
+            </div>
+          </div>
+        `;
+      } else if (nextUserMatch && nextUserMatch.teamAId && nextUserMatch.teamBId) {
+        const oppId = nextUserMatch.teamAId === user.id ? nextUserMatch.teamBId : nextUserMatch.teamAId;
+        const opp = getTeam(oppId);
+        const scouted = isScoutingActiveForMatch(nextUserMatch);
+        const odds = calculateMatchupOdds(user, opp, nextUserMatch);
+        const oppStyle = getStyleObj(opp.style);
+        const recommendedStyle = TACTICAL_STYLES.find(s => s.counters === opp.style);
+
+        cardEl.innerHTML = `
+          <div class="flex flex-col space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Next Franchise Matchup</span>
+                <span class="text-xs font-mono text-slate-400">${ROUND_NAMES[nextUserMatch.round]}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                ${scouted
+                  ? `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1"><i data-lucide="eye" class="w-3.5 h-3.5"></i> Scouting Active (+10% Win Boost)</span>`
+                  : `<button onclick="buyScoutingReport()" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 flex items-center gap-1 transition"><i data-lucide="radar" class="w-3.5 h-3.5"></i> Buy Scouting Report ($75,000)</button>`
+                }
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-11 gap-4 items-center bg-slate-950/70 border border-slate-800/90 rounded-xl p-4">
+              <!-- User Team -->
+              <div class="md:col-span-4 flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center font-mono font-extrabold text-lg text-slate-950 shrink-0" style="background:${user.color}">
+                  #${user.seed}
+                </div>
+                <div>
+                  <div class="text-xs font-semibold text-emerald-400">YOUR FRANCHISE</div>
+                  <div class="text-base sm:text-lg font-extrabold text-white">${user.name}</div>
+                  <div class="text-[11px] font-mono text-slate-400">OFF ${user.offense} • DEF ${user.defense} • FATIGUE ${user.fatigue}%</div>
+                </div>
+              </div>
+
+              <!-- VS & Win Probability -->
+              <div class="md:col-span-3 flex flex-col items-center justify-center text-center py-2 md:py-0 border-y md:border-y-0 md:border-x border-slate-800">
+                <div class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Win Probability</div>
+                <div class="text-xl font-mono font-extrabold ${odds.probA >= 50 ? 'text-emerald-400' : 'text-amber-400'}">${odds.probA}%</div>
+                <div class="w-32 h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1">
+                  <div class="h-full bg-emerald-400" style="width: ${odds.probA}%"></div>
+                </div>
+              </div>
+
+              <!-- Opponent Team -->
+              <div class="md:col-span-4 flex items-center justify-between md:justify-end gap-3 text-left md:text-right">
+                <div>
+                  <div class="text-xs font-semibold text-slate-400">OPPONENT</div>
+                  <div class="text-base sm:text-lg font-extrabold text-white">${opp.name}</div>
+                  <div class="text-[11px] font-mono text-slate-400">OFF ${opp.offense} • DEF ${opp.defense} • TMP ${opp.tempo}</div>
+                </div>
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center font-mono font-extrabold text-lg text-slate-950 shrink-0" style="background:${opp.color}">
+                  #${opp.seed}
+                </div>
+              </div>
+            </div>
+
+            <!-- Scouting Intel & Match Trigger Buttons -->
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <div class="text-xs text-slate-300 flex items-center gap-2">
+                <i data-lucide="info" class="w-4 h-4 text-amber-400 shrink-0"></i>
+                ${scouted
+                  ? `<span><strong>Scouted Intel:</strong> ${opp.name} runs <em>${oppStyle.name}</em>.${recommendedStyle ? `Switch to <strong>${recommendedStyle.name}</strong> in Franchise tab for an extra tactical counter edge!` : 'Balanced scheme recommended.'}</span>`
+                  : `<span class="text-slate-400">Opponent tactical scheme hidden. Purchase a Scouting Report to reveal weaknesses and gain +10% win odds.</span>`
+                }
+              </div>
+              <div class="flex items-center gap-2.5 ml-auto">
+                <button onclick="openMatchModal('${nextUserMatch.id}')" class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-emerald-950/50 transition">
+                  <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+                  <span>Open Match Center & Simulate</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (user.eliminated) {
+        cardEl.innerHTML = `
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">Eliminated from Active Bracket</span>
+              <h2 class="text-xl font-extrabold text-white mt-2">${user.name} Eliminated in ${ROUND_NAMES[state.currentRound]}</h2>
+              <p class="text-xs text-slate-400 mt-1">Simulate the remaining AI games to crown a champion and launch next season with your accumulated upgrades.</p>
+            </div>
+            <button onclick="simRemainingMatchesInCurrentRound(true)" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm flex items-center gap-2 shrink-0 transition">
+              <i data-lucide="fast-forward" class="w-4 h-4"></i>
+              <span>Sim Remaining Round Matches</span>
+            </button>
+          </div>
+        `;
+      } else {
+        cardEl.innerHTML = `
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">Waiting on Next Opponent</span>
+              <h2 class="text-xl font-extrabold text-white mt-2">You Advanced to the ${ROUND_NAMES[Math.min(3, state.currentRound + 1)]}!</h2>
+              <p class="text-xs text-slate-400 mt-1">Simulate the remaining AI matchups in the ${ROUND_NAMES[state.currentRound]} to determine your next opponent.</p>
+            </div>
+            <button onclick="simRemainingMatchesInCurrentRound(false)" class="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shrink-0 transition">
+              <i data-lucide="fast-forward" class="w-4 h-4"></i>
+              <span>Sim Remaining AI Matches</span>
+            </button>
+          </div>
+        `;
+      }
+
+      // Render 4 Bracket Columns
+      const treeContainer = document.getElementById('bracketTreeContainer');
+      treeContainer.innerHTML = ROUND_NAMES.map((rName, rIdx) => {
+        const matches = state.bracket[rIdx] || [];
+        const isCurrentRound = !state.tournamentComplete && state.currentRound === rIdx;
+
+        return `
+          <div class="flex flex-col h-full">
+            <!-- Column Header -->
+            <div class="mb-4 pb-2 border-b ${isCurrentRound ? 'border-emerald-500/50' : 'border-slate-800'} flex items-center justify-between">
+              <div>
+                <h3 class="text-xs font-extrabold uppercase tracking-wider ${isCurrentRound ? 'text-emerald-400' : 'text-slate-300'}">${rName}</h3>
+                <span class="text-[11px] font-mono text-slate-400">Prize: ${formatCash(ROUND_REWARDS[rIdx])}</span>
+              </div>
+              ${isCurrentRound ? `<span class="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">ACTIVE</span>` : ''}
+            </div>
+
+            <!-- Matches Stack -->
+            <div class="flex-1 flex flex-col justify-around gap-3 py-1">
+              ${matches.map(m => renderBracketMatchTile(m)).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderBracketMatchTile(match) {
+      const teamA = getTeam(match.teamAId);
+      const teamB = getTeam(match.teamBId);
+      const user = getUserTeam();
+      const involvesUser = match.teamAId === user.id || match.teamBId === user.id;
+      const isCompleted = match.status === 'completed';
+      const isReady = teamA && teamB && !isCompleted;
+      const scouted = isScoutingActiveForMatch(match);
+
+      let borderClass = 'border-slate-800 hover:border-slate-600';
+      if (involvesUser && isReady) {
+        borderClass = 'border-emerald-500/80 hover:border-emerald-400 pulse-live';
+      } else if (involvesUser && isCompleted) {
+        borderClass = match.winnerId === user.id ? 'border-emerald-700/70' : 'border-rose-800/70';
+      } else if (isReady) {
+        borderClass = 'border-slate-700/90 hover:border-sky-500/60';
+      }
+
+      const statusBadge = isCompleted
+        ? `<span class="text-[10px] font-mono font-bold text-slate-400">FINAL${match.boxScore?.isOT ? '/OT' : ''}</span>`
+        : isReady
+          ? `<span class="text-[10px] font-mono font-semibold ${involvesUser ? 'text-emerald-400' : 'text-sky-400'}">${involvesUser ? 'YOUR MATCH' : 'READY'}</span>`
+          : `<span class="text-[10px] font-mono text-slate-600">TBD</span>`;
+
+      const renderTeamRow = (team, score, isWinner) => {
+        if (!team) {
+          return `
+            <div class="flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-600">
+              <span class="font-mono">TBD</span>
+              <span>—</span>
+            </div>
+          `;
+        }
+        const highlightUser = team.isUser ? 'text-emerald-400 font-bold' : isWinner ? 'text-white font-semibold' : isCompleted ? 'text-slate-500' : 'text-slate-200';
+        return `
+          <div class="flex items-center justify-between px-2.5 py-1.5 text-xs ${isCompleted && !isWinner ? 'opacity-60' : ''}">
+            <div class="flex items-center gap-2 truncate pr-2">
+              <span class="w-4 text-[10px] font-mono text-slate-400 text-right">${team.seed}</span>
+              <span class="w-2 h-2 rounded-full shrink-0" style="background:${team.color}"></span>
+              <span class="truncate ${highlightUser}">${team.name}</span>
+            </div>
+            <span class="font-mono font-bold ${isWinner ? 'text-emerald-400' : 'text-slate-400'}">${score !== null ? score : ''}</span>
+          </div>
+        `;
+      };
+
+      const clickAttr = (teamA && teamB) ? `onclick="openMatchModal('${match.id}')"` : '';
+
+      return `
+        <div ${clickAttr} class="bg-slate-900/95 border ${borderClass} rounded-xl overflow-hidden shadow transition ${(teamA && teamB) ? 'cursor-pointer hover:-translate-y-0.5' : 'opacity-70 cursor-default'}">
+          <div class="px-2.5 py-1 bg-slate-950/80 border-b border-slate-800/80 flex items-center justify-between">
+            ${statusBadge}
+            <div class="flex items-center gap-1">
+              ${scouted ? `<span title="Scouting Active" class="w-2 h-2 rounded-full bg-amber-400"></span>` : ''}
+              ${(teamA && teamB) ? `<span class="text-[10px] text-slate-400">${isCompleted ? 'Box Score' : 'Preview / Sim'}</span>` : ''}
+            </div>
+          </div>
+          <div class="divide-y divide-slate-800/60">
+            ${renderTeamRow(teamA, match.scoreA, match.winnerId === match.teamAId)}
+            ${renderTeamRow(teamB, match.scoreB, match.winnerId === match.teamBId)}
+          </div>
+        </div>
+      `;
+    }
+
+    // Render Tab 2: Franchise Roster & Tycoon Upgrades
+    function renderFranchiseTab() {
+      const user = getUserTeam();
+      const eff = getEffectiveRating(user);
+
+      document.getElementById('franchiseTabTeamName').textContent = user.name;
+      document.getElementById('franchiseSeedBadge').textContent = `#${user.seed}`;
+      document.getElementById('upgradeStoreCash').textContent = formatCash(state.cash);
+
+      // Core Ratings Gauges
+      const ratingsData = [
+        {
+          label: 'Offense Rating',
+          val: user.offense,
+          effVal: Math.round(eff.effOff),
+          max: 99,
+          color: 'bg-emerald-500',
+          desc: 'Scoring efficiency, shooting percentages, and clutch conversion.'
+        },
+        {
+          label: 'Defense Rating',
+          val: user.defense,
+          effVal: Math.round(eff.effDef),
+          max: 99,
+          color: 'bg-sky-500',
+          desc: 'Shot contest rate, rim protection, and forced turnovers.'
+        },
+        {
+          label: 'Tempo & Pace',
+          val: user.tempo,
+          effVal: user.tempo,
+          max: 99,
+          color: 'bg-indigo-500',
+          desc: 'Possessions per quarter and fast-break transition frequency.'
+        },
+        {
+          label: 'Roster Fatigue',
+          val: user.fatigue,
+          effVal: user.fatigue,
+          max: 100,
+          isPercent: true,
+          color: user.fatigue > 45 ? 'bg-rose-500' : user.fatigue > 20 ? 'bg-amber-500' : 'bg-teal-500',
+          desc: user.fatigue > 0
+            ? `Currently applying a -${eff.fatiguePenalty} rating penalty to Offense & Defense.`
+            : 'Peak conditioning! Zero fatigue penalty on court.'
+        }
+      ];
+
+      document.getElementById('franchiseCoreRatingsList').innerHTML = ratingsData.map(r => `
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-bold text-slate-200">${r.label}</span>
+            <span class="font-mono font-bold text-white">
+              ${r.val}${r.isPercent ? '%' : '/99'}
+              ${!r.isPercent && r.effVal < r.val ? `<span class="text-rose-400 text-[11px]">(Eff: ${r.effVal})</span>` : ''}
+            </span>
+          </div>
+          <div class="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+            <div class="h-full ${r.color} transition-all duration-300" style="width: ${clamp(r.val, 0, 100)}%"></div>
+          </div>
+          <p class="text-[11px] text-slate-400">${r.desc}</p>
+        </div>
+      `).join('');
+
+      // Tactical Scheme Selector
+      document.getElementById('tacticalSchemeButtons').innerHTML = TACTICAL_STYLES.map(st => {
+        const active = user.style === st.id;
+        return `
+          <button onclick="setUserTacticalStyle('${st.id}')" class="p-3 rounded-xl border text-left transition ${active ? 'bg-sky-500/15 border-sky-500 text-white' : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'}">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold">${st.name}</span>
+              ${active ? `<span class="w-2 h-2 rounded-full bg-sky-400"></span>` : ''}
+            </div>
+            <p class="text-[11px] text-slate-400 mt-1 leading-snug">${st.desc}</p>
+          </button>
+        `;
+      }).join('');
+
+      // Tycoon Upgrades Grid
+      const costs = getUpgradeCosts();
+      const nextMatch = getUserNextScheduledMatch();
+      const scoutBought = nextMatch && state.upgrades.scoutingActiveForRound === nextMatch.round;
+
+      document.getElementById('tycoonUpgradesGrid').innerHTML = `
+        <!-- Upgrade 1: Training Camp -->
+        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-4">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+                <i data-lucide="dumbbell" class="w-5 h-5"></i>
+              </div>
+              <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-emerald-400">Level ${state.upgrades.trainingCampLevel}</span>
+            </div>
+            <h3 class="text-base font-bold text-white">Training Camp</h3>
+            <p class="text-xs text-slate-400">Permanently boosts Franchise Offense (+3), Defense (+3), Tempo (+1), and upgrades all starting players.</p>
+          </div>
+          <button onclick="buyTrainingCampUpgrade()" class="w-full py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-between transition ${state.cash >= costs.trainingCampCost ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}">
+            <span>Upgrade Training Camp</span>
+            <span class="font-mono">${formatCash(costs.trainingCampCost)}</span>
+          </button>
+        </div>
+
+        <!-- Upgrade 2: Sports Science Facility -->
+        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-4">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="p-2 rounded-lg bg-sky-500/10 text-sky-400">
+                <i data-lucide="heart-pulse" class="w-5 h-5"></i>
+              </div>
+              <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-sky-400">Level ${state.upgrades.sportsScienceLevel} / 5</span>
+            </div>
+            <h3 class="text-base font-bold text-white">Sports Science Facility</h3>
+            <p class="text-xs text-slate-400">Reduces match fatigue accumulation by 20% per level, increases between-round recovery, and immediately heals 25% fatigue.</p>
+          </div>
+          <button onclick="buySportsScienceUpgrade()" class="w-full py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-between transition ${(state.cash >= costs.sportsScienceCost && state.upgrades.sportsScienceLevel < 5) ? 'bg-sky-500 hover:bg-sky-400 text-slate-950' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}">
+            <span>${state.upgrades.sportsScienceLevel >= 5 ? 'Max Level Reached' : 'Upgrade Facility'}</span>
+            <span class="font-mono">${state.upgrades.sportsScienceLevel >= 5 ? 'MAX' : formatCash(costs.sportsScienceCost)}</span>
+          </button>
+        </div>
+
+        <!-- Upgrade 3: Scouting Report -->
+        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-4">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="p-2 rounded-lg bg-amber-500/10 text-amber-400">
+                <i data-lucide="radar" class="w-5 h-5"></i>
+              </div>
+              <span class="text-xs font-mono px-2 py-0.5 rounded ${scoutBought ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-800 text-slate-400'}">${scoutBought ? 'ACTIVE THIS ROUND' : 'PER ROUND'}</span>
+            </div>
+            <h3 class="text-base font-bold text-white">Opponent Scouting Report</h3>
+            <p class="text-xs text-slate-400">Unlocks opponent tactical scheme weaknesses for your upcoming matchup and grants a direct +10% match win probability boost.</p>
+          </div>
+          <button onclick="buyScoutingReport()" class="w-full py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-between transition ${(!scoutBought && nextMatch && state.cash >= costs.scoutingCost) ? 'bg-amber-500 hover:bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}">
+            <span>${scoutBought ? 'Scouted for Current Round' : 'Purchase Scouting Report'}</span>
+            <span class="font-mono">${scoutBought ? 'ACTIVE' : formatCash(costs.scoutingCost)}</span>
+          </button>
+        </div>
+
+        <!-- Upgrade 4: Hyperbaric Cryo Recovery -->
+        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-4">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="p-2 rounded-lg bg-teal-500/10 text-teal-400">
+                <i data-lucide="thermometer-snowflake" class="w-5 h-5"></i>
+              </div>
+              <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-teal-400">Fatigue: ${user.fatigue}%</span>
+            </div>
+            <h3 class="text-base font-bold text-white">Cryo Recovery Session</h3>
+            <p class="text-xs text-slate-400">Immediate medical staff intervention between rounds that flushes lactic acid and reduces team fatigue by 35%.</p>
+          </div>
+          <button onclick="buyCryoRecoverySession()" class="w-full py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-between transition ${(user.fatigue > 0 && state.cash >= costs.recoverySessionCost) ? 'bg-teal-500 hover:bg-teal-400 text-slate-950' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}">
+            <span>Run Recovery Session</span>
+            <span class="font-mono">${formatCash(costs.recoverySessionCost)}</span>
+          </button>
+        </div>
+      `;
+
+      // Starting 5 Roster Cards
+      document.getElementById('franchiseRosterGrid').innerHTML = user.roster.map(p => {
+        const ppg = p.games > 0 ? (p.pts / p.games).toFixed(1) : '0.0';
+        const rpg = p.games > 0 ? (p.reb / p.games).toFixed(1) : '0.0';
+        const apg = p.games > 0 ? (p.ast / p.games).toFixed(1) : '0.0';
+        return `
+          <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-4 flex flex-col justify-between space-y-3">
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">${p.pos}</span>
+                <span class="text-xs font-mono text-slate-400">OVR ${Math.round((p.off + p.def) / 2)}</span>
+              </div>
+              <h4 class="text-sm font-bold text-white mt-2 truncate">${p.name}</h4>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-xs bg-slate-900 p-2 rounded-lg border border-slate-800/80">
+              <div>
+                <span class="text-[10px] text-slate-400 block">OFF</span>
+                <span class="font-mono font-bold text-emerald-400">${p.off}</span>
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-400 block">DEF</span>
+                <span class="font-mono font-bold text-sky-400">${p.def}</span>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-slate-300">
+              <span>${ppg} PPG</span>
+              <span>${rpg} RPG</span>
+              <span>${apg} APG</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Render Tab 3: League Standings & Power Rankings
+    function setStandingsSort(criterion) {
+      standingsSortBy = criterion;
+      renderStandingsTab();
+    }
+
+    function renderStandingsTab() {
+      ['power', 'seed', 'offense', 'defense'].forEach(key => {
+        const btn = document.getElementById(`sortBtn-${key}`);
+        if (btn) {
+          btn.className = standingsSortBy === key
+            ? 'px-3 py-1.5 rounded-lg text-xs font-semibold border transition bg-sky-500/20 border-sky-500 text-sky-300'
+            : 'px-3 py-1.5 rounded-lg text-xs font-semibold border transition bg-slate-950 border-slate-800 text-slate-400 hover:text-white';
+        }
+      });
+
+      // Compute Power Score for each team
+      const enriched = state.teams.map(t => {
+        const diff = t.ptsFor - t.ptsAgainst;
+        const powerScore = getTeamOVR(t) + (t.wins * 6) - (t.losses * 4) + (diff * 0.15);
+        return { ...t, diff, powerScore };
+      });
+
+      // Determine Power Rank (1 to 16)
+      const byPower = [...enriched].sort((a, b) => b.powerScore - a.powerScore);
+      const powerRankMap = {};
+      byPower.forEach((t, idx) => {
+        powerRankMap[t.id] = idx + 1;
+      });
+
+      // Apply user-selected sort
+      enriched.sort((a, b) => {
+        if (standingsSortBy === 'seed') return a.seed - b.seed;
+        if (standingsSortBy === 'offense') return b.offense - a.offense;
+        if (standingsSortBy === 'defense') return b.defense - a.defense;
+        return powerRankMap[a.id] - powerRankMap[b.id];
+      });
+
+      const tbody = document.getElementById('standingsTableBody');
+      tbody.innerHTML = enriched.map(t => {
+        const pRank = powerRankMap[t.id];
+        const stObj = getStyleObj(t.style);
+        const isChamp = state.tournamentComplete && state.championTeamId === t.id;
+
+        let statusPill = `<span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">Active</span>`;
+        if (isChamp) {
+          statusPill = `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">Champion</span>`;
+        } else if (t.eliminated) {
+          statusPill = `<span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-800 text-slate-400">Eliminated</span>`;
+        }
+
+        return `
+          <tr class="${t.isUser ? 'bg-emerald-500/10' : 'hover:bg-slate-800/40'} transition">
+            <td class="py-3 px-3 font-mono font-bold text-white">#${pRank}</td>
+            <td class="py-3 px-3 font-mono text-slate-400">#${t.seed}</td>
+            <td class="py-3 px-3">
+              <div class="flex items-center gap-2.5">
+                <span class="w-3 h-3 rounded-full shrink-0" style="background:${t.color}"></span>
+                <span class="font-bold ${t.isUser ? 'text-emerald-400' : 'text-white'}">${t.name}</span>
+                ${t.isUser ? `<span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">YOU</span>` : ''}
+              </div>
+            </td>
+            <td class="py-3 px-3">${statusPill}</td>
+            <td class="py-3 px-3 text-xs text-slate-300">${stObj.name}</td>
+            <td class="py-3 px-3 text-center font-mono font-semibold text-emerald-400">${t.offense}</td>
+            <td class="py-3 px-3 text-center font-mono font-semibold text-sky-400">${t.defense}</td>
+            <td class="py-3 px-3 text-center font-mono text-slate-300">${t.tempo}</td>
+            <td class="py-3 px-3 text-center font-mono ${t.fatigue > 40 ? 'text-rose-400' : 'text-slate-400'}">${t.fatigue}%</td>
+            <td class="py-3 px-3 text-center font-mono font-bold text-white">${t.wins} - ${t.losses}</td>
+            <td class="py-3 px-3 text-right font-mono font-semibold ${t.diff > 0 ? 'text-emerald-400' : t.diff < 0 ? 'text-rose-400' : 'text-slate-400'}">
+              ${t.diff > 0 ? `+${t.diff}` : t.diff}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // MODAL & LIVE MATCH SIMULATION TICKER LOGIC
+    function openMatchModal(matchId) {
+      const match = getMatchById(matchId);
+      if (!match || !match.teamAId || !match.teamBId) return;
+
+      clearLiveSimTimer();
+      activeModalMatchId = matchId;
+      document.getElementById('matchModalBackdrop').classList.remove('hidden');
+      document.getElementById('modalMatchRoundBadge').textContent = ROUND_NAMES[match.round];
+
+      if (match.status === 'completed') {
+        renderModalBoxScore(match);
+      } else {
+        renderModalPreGame(match);
+      }
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function closeMatchModal() {
+      // If a live simulation is running and not yet committed, finalize it cleanly or stop timer
+      if (liveSimState && !liveSimState.finished) {
+        finishLiveSimulationImmediately();
+      }
+      clearLiveSimTimer();
+      activeModalMatchId = null;
+      document.getElementById('matchModalBackdrop').classList.add('hidden');
+    }
+
+    function clearLiveSimTimer() {
+      if (liveSimTimer) {
+        clearInterval(liveSimTimer);
+        liveSimTimer = null;
+      }
+      liveSimState = null;
+    }
+
+    // Render Pre-Game Preview inside Modal
+    function renderModalPreGame(match) {
+      const teamA = getTeam(match.teamAId);
+      const teamB = getTeam(match.teamBId);
+      const odds = calculateMatchupOdds(teamA, teamB, match);
+      const scouted = isScoutingActiveForMatch(match);
+      const involvesUser = teamA.isUser || teamB.isUser;
+
+      document.getElementById('modalMatchStatusBadge').textContent = 'Pre-Game Matchup Preview';
+      document.getElementById('modalMatchStatusBadge').className = 'text-xs font-semibold px-2.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30';
+
+      const styleA = getStyleObj(teamA.style);
+      const styleB = getStyleObj(teamB.style);
+
+      const body = document.getElementById('modalMatchBody');
+      body.innerHTML = `
+        <!-- Head to Head Banner -->
+        <div class="grid grid-cols-1 md:grid-cols-11 gap-4 items-center bg-slate-950 border border-slate-800 rounded-2xl p-5">
+          <!-- Team A -->
+          <div class="md:col-span-4 flex items-center gap-3.5">
+            <div class="w-14 h-14 rounded-2xl flex items-center justify-center font-mono font-extrabold text-xl text-slate-950 shrink-0" style="background:${teamA.color}">
+              #${teamA.seed}
+            </div>
+            <div>
+              <span class="text-[10px] font-mono uppercase tracking-wider ${teamA.isUser ? 'text-emerald-400 font-bold' : 'text-slate-400'}">${teamA.isUser ? 'YOUR FRANCHISE' : 'CONTENDER'}</span>
+              <h3 class="text-xl font-extrabold text-white">${teamA.name}</h3>
+              <span class="text-xs text-slate-400">Record: ${teamA.wins}W - ${teamA.losses}L</span>
+            </div>
+          </div>
+
+          <!-- Center Odds -->
+          <div class="md:col-span-3 flex flex-col items-center justify-center text-center py-2">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Win Probability</span>
+            <div class="flex items-center gap-3 mt-1 font-mono font-extrabold text-lg">
+              <span class="text-emerald-400">${odds.probA}%</span>
+              <span class="text-xs text-slate-600">VS</span>
+              <span class="text-sky-400">${odds.probB}%</span>
+            </div>
+            <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden flex mt-1.5">
+              <div class="h-full bg-emerald-500" style="width:${odds.probA}%"></div>
+              <div class="h-full bg-sky-500" style="width:${odds.probB}%"></div>
+            </div>
+            ${scouted ? `<span class="mt-2 text-[11px] font-semibold text-amber-300 flex items-center gap-1"><i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> +10% Scouting Edge Applied</span>` : ''}
+          </div>
+
+          <!-- Team B -->
+          <div class="md:col-span-4 flex items-center justify-between md:justify-end gap-3.5 text-left md:text-right">
+            <div>
+              <span class="text-[10px] font-mono uppercase tracking-wider ${teamB.isUser ? 'text-emerald-400 font-bold' : 'text-slate-400'}">${teamB.isUser ? 'YOUR FRANCHISE' : 'CONTENDER'}</span>
+              <h3 class="text-xl font-extrabold text-white">${teamB.name}</h3>
+              <span class="text-xs text-slate-400">Record: ${teamB.wins}W - ${teamB.losses}L</span>
+            </div>
+            <div class="w-14 h-14 rounded-2xl flex items-center justify-center font-mono font-extrabold text-xl text-slate-950 shrink-0" style="background:${teamB.color}">
+              #${teamB.seed}
+            </div>
+          </div>
+        </div>
+
+        <!-- Tale of the Tape Rating Bars -->
+        <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-5 space-y-4">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 text-center">Tale of the Tape</h4>
+          ${[
+            { label: 'Offense', a: teamA.offense, b: teamB.offense },
+            { label: 'Defense', a: teamA.defense, b: teamB.defense },
+            { label: 'Tempo', a: teamA.tempo, b: teamB.tempo },
+            { label: 'Fatigue', a: `${teamA.fatigue}%`, b: `${teamB.fatigue}%`, rawA: teamA.fatigue, rawB: teamB.fatigue, invert: true }
+          ].map(row => {
+            const numA = row.rawA !== undefined ? row.rawA : row.a;
+            const numB = row.rawB !== undefined ? row.rawB : row.b;
+            const aBetter = row.invert ? numA <= numB : numA >= numB;
+            const bBetter = row.invert ? numB <= numA : numB >= numA;
+            return `
+              <div class="grid grid-cols-7 items-center gap-3 text-xs sm:text-sm">
+                <div class="col-span-2 font-mono font-bold ${aBetter ? 'text-emerald-400' : 'text-slate-400'}">${row.a}</div>
+                <div class="col-span-3 text-center font-semibold text-slate-300 text-xs uppercase tracking-wider">${row.label}</div>
+                <div class="col-span-2 text-right font-mono font-bold ${bBetter ? 'text-emerald-400' : 'text-slate-400'}">${row.b}</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <!-- Tactical Breakdown & Scouting Box -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4">
+            <div class="text-[11px] font-bold uppercase text-slate-400">${teamA.name} System</div>
+            <div class="text-sm font-bold text-white mt-1">${(!involvesUser || teamA.isUser || scouted) ? styleA.name : 'Unscouted Scheme'}</div>
+            <p class="text-xs text-slate-400 mt-1">${(!involvesUser || teamA.isUser || scouted) ? styleA.desc : 'Purchase a Scouting Report to reveal opponent tactical weaknesses.'}</p>
+          </div>
+          <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4">
+            <div class="text-[11px] font-bold uppercase text-slate-400">${teamB.name} System</div>
+            <div class="text-sm font-bold text-white mt-1">${(!involvesUser || teamB.isUser || scouted) ? styleB.name : 'Unscouted Scheme'}</div>
+            <p class="text-xs text-slate-400 mt-1">${(!involvesUser || teamB.isUser || scouted) ? styleB.desc : 'Purchase a Scouting Report to reveal opponent tactical weaknesses.'}</p>
+          </div>
+        </div>
+      `;
+
+      const footer = document.getElementById('modalMatchFooter');
+      footer.innerHTML = `
+        <div class="flex items-center gap-2">
+          ${(involvesUser && !scouted) ? `
+            <button onclick="buyScoutingReport(); renderModalPreGame(getMatchById('${match.id}')); lucide.createIcons();" class="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold flex items-center gap-1.5 transition">
+              <i data-lucide="radar" class="w-4 h-4"></i>
+              <span>Scout Opponent ($75k)</span>
+            </button>
+          ` : `<span class="text-xs text-slate-400 font-mono">Select simulation mode:</span>`}
+        </div>
+        <div class="flex flex-wrap items-center gap-2.5">
+          <button onclick="runInstantSimFromModal('${match.id}')" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition">
+            <i data-lucide="zap" class="w-4 h-4 text-amber-400"></i>
+            <span>Instant Sim</span>
+          </button>
+          <button onclick="startLiveTickerSimulation('${match.id}')" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs sm:text-sm font-extrabold flex items-center gap-2 shadow-lg shadow-emerald-950/50 transition">
+            <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+            <span>Simulate Game (Live Ticker)</span>
+          </button>
+        </div>
+      `;
+    }
+
+    // Instant Sim from Modal
+    function runInstantSimFromModal(matchId) {
+      const match = getMatchById(matchId);
+      if (!match || match.status === 'completed') return;
+      const simData = generateMatchSimulationData(match);
+      commitMatchResult(match, simData);
+      renderModalBoxScore(match);
+      if (window.lucide) lucide.createIcons();
+    }
+
+    // Live Quarter-by-Quarter Score Ticker Animation
+    function startLiveTickerSimulation(matchId) {
+      const match = getMatchById(matchId);
+      if (!match || match.status === 'completed') return;
+
+      const simData = generateMatchSimulationData(match);
+      const teamA = getTeam(match.teamAId);
+      const teamB = getTeam(match.teamBId);
+      const totalQuarters = simData.quartersA.length;
+
+      // Build step-by-step timeline ticks (3 ticks per quarter)
+      const ticks = [];
+      let runningA = 0;
+      let runningB = 0;
+
+      for (let qIdx = 0; qIdx < totalQuarters; qIdx++) {
+        const qLabel = qIdx < 4 ? `Q${qIdx + 1}` : 'OT';
+        const qPtsA = simData.quartersA[qIdx];
+        const qPtsB = simData.quartersB[qIdx];
+        const qEvents = simData.events.filter(e => e.quarter === qLabel);
+
+        const segA1 = Math.round(qPtsA * 0.33);
+        const segA2 = Math.round(qPtsA * 0.33);
+        const segA3 = qPtsA - segA1 - segA2;
+
+        const segB1 = Math.round(qPtsB * 0.33);
+        const segB2 = Math.round(qPtsB * 0.33);
+        const segB3 = qPtsB - segB1 - segB2;
+
+        runningA += segA1;
+        runningB += segB1;
+        ticks.push({
+          qIdx,
+          qLabel,
+          clock: qEvents[0]?.clock || '8:42',
+          scoreA: runningA,
+          scoreB: runningB,
+          event: qEvents[0] || null
+        });
+
+        runningA += segA2;
+        runningB += segB2;
+        ticks.push({
+          qIdx,
+          qLabel,
+          clock: qEvents[1]?.clock || '4:15',
+          scoreA: runningA,
+          scoreB: runningB,
+          event: qEvents[1] || null
+        });
+
+        runningA += segA3;
+        runningB += segB3;
+        ticks.push({
+          qIdx,
+          qLabel,
+          clock: '0:00',
+          scoreA: runningA,
+          scoreB: runningB,
+          event: qEvents[2] || qEvents[0] || null,
+          endOfQuarter: true
+        });
+      }
+
+      liveSimState = {
+        match,
+        simData,
+        ticks,
+        currentTick: 0,
+        speedMs: 650,
+        finished: false
+      };
+
+      document.getElementById('modalMatchStatusBadge').textContent = 'LIVE BROADCAST SIMULATION';
+      document.getElementById('modalMatchStatusBadge').className = 'text-xs font-bold px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse';
+
+      const body = document.getElementById('modalMatchBody');
+      body.innerHTML = `
+        <!-- Live Scoreboard -->
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5">
+          <div class="grid grid-cols-11 items-center gap-4">
+            <div class="col-span-4 flex items-center gap-3">
+              <div class="w-12 h-12 rounded-xl flex items-center justify-center font-mono font-extrabold text-slate-950" style="background:${teamA.color}">#${teamA.seed}</div>
+              <div>
+                <div class="text-sm sm:text-base font-extrabold text-white">${teamA.name}</div>
+                <div class="text-[11px] font-mono text-slate-400">OFF ${teamA.offense} • DEF ${teamA.defense}</div>
+              </div>
+            </div>
+
+            <div class="col-span-3 text-center">
+              <div id="liveTickerClock" class="text-xs font-mono font-bold text-emerald-400 uppercase">Q1 • 12:00</div>
+              <div class="text-2xl sm:text-4xl font-mono font-extrabold text-white mt-1 flex items-center justify-center gap-3">
+                <span id="liveScoreA">0</span>
+                <span class="text-slate-600 text-xl">:</span>
+                <span id="liveScoreB">0</span>
+              </div>
+            </div>
+
+            <div class="col-span-4 flex items-center justify-end gap-3 text-right">
+              <div>
+                <div class="text-sm sm:text-base font-extrabold text-white">${teamB.name}</div>
+                <div class="text-[11px] font-mono text-slate-400">OFF ${teamB.offense} • DEF ${teamB.defense}</div>
+              </div>
+              <div class="w-12 h-12 rounded-xl flex items-center justify-center font-mono font-extrabold text-slate-950" style="background:${teamB.color}">#${teamB.seed}</div>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mt-5">
+            <div id="liveSimProgressBar" class="h-full bg-emerald-400 transition-all duration-300" style="width: 5%"></div>
+          </div>
+        </div>
+
+        <!-- Quarter by Quarter Live Table -->
+        <div class="bg-slate-950/60 border border-slate-800 rounded-xl p-4 overflow-x-auto">
+          <table class="w-full text-xs font-mono">
+            <thead>
+              <tr class="text-slate-400 border-b border-slate-800">
+                <th class="text-left py-1.5">TEAM</th>
+                <th class="text-center py-1.5">Q1</th>
+                <th class="text-center py-1.5">Q2</th>
+                <th class="text-center py-1.5">Q3</th>
+                <th class="text-center py-1.5">Q4</th>
+                ${simData.isOT ? `<th class="text-center py-1.5 text-amber-400">OT</th>` : ''}
+                <th class="text-right py-1.5 text-white">TOTAL</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60">
+              <tr>
+                <td class="py-2 font-sans font-bold text-white">${teamA.name}</td>
+                <td id="liveCellA_0" class="text-center text-slate-500">-</td>
+                <td id="liveCellA_1" class="text-center text-slate-500">-</td>
+                <td id="liveCellA_2" class="text-center text-slate-500">-</td>
+                <td id="liveCellA_3" class="text-center text-slate-500">-</td>
+                ${simData.isOT ? `<td id="liveCellA_4" class="text-center text-slate-500">-</td>` : ''}
+                <td id="liveTotalCellA" class="text-right font-bold text-emerald-400">0</td>
+              </tr>
+              <tr>
+                <td class="py-2 font-sans font-bold text-white">${teamB.name}</td>
+                <td id="liveCellB_0" class="text-center text-slate-500">-</td>
+                <td id="liveCellB_1" class="text-center text-slate-500">-</td>
+                <td id="liveCellB_2" class="text-center text-slate-500">-</td>
+                <td id="liveCellB_3" class="text-center text-slate-500">-</td>
+                ${simData.isOT ? `<td id="liveCellB_4" class="text-center text-slate-500">-</td>` : ''}
+                <td id="liveTotalCellB" class="text-right font-bold text-sky-400">0</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Live Play-by-Play Feed -->
+        <div class="space-y-2">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-400">Live Play-by-Play Ticker</div>
+          <div id="livePlayFeed" class="bg-slate-950 border border-slate-800 rounded-xl p-4 h-48 overflow-y-auto space-y-2.5 text-xs">
+            <div class="text-slate-500 font-mono">Tip-off underway at center court...</div>
+          </div>
+        </div>
+      `;
+
+      const footer = document.getElementById('modalMatchFooter');
+      footer.innerHTML = `
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-400">Ticker Speed:</span>
+          <button onclick="setLiveSimSpeed(650)" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs font-mono text-white">1x</button>
+          <button onclick="setLiveSimSpeed(280)" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs font-mono text-emerald-400">2x</button>
+        </div>
+        <button onclick="finishLiveSimulationImmediately()" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition">
+          <i data-lucide="skip-forward" class="w-4 h-4"></i>
+          <span>Skip to Final Box Score</span>
+        </button>
+      `;
+
+      if (window.lucide) lucide.createIcons();
+      liveSimTimer = setInterval(stepLiveSimulationTick, liveSimState.speedMs);
+    }
+
+    function setLiveSimSpeed(ms) {
+      if (!liveSimState || liveSimState.finished) return;
+      liveSimState.speedMs = ms;
+      if (liveSimTimer) clearInterval(liveSimTimer);
+      liveSimTimer = setInterval(stepLiveSimulationTick, ms);
+    }
+
+    function stepLiveSimulationTick() {
+      if (!liveSimState || liveSimState.finished) return;
+
+      const { ticks, currentTick, simData } = liveSimState;
+      if (currentTick >= ticks.length) {
+        finishLiveSimulationImmediately();
+        return;
+      }
+
+      const tick = ticks[currentTick];
+      liveSimState.currentTick += 1;
+
+      const clockEl = document.getElementById('liveTickerClock');
+      const scoreAEl = document.getElementById('liveScoreA');
+      const scoreBEl = document.getElementById('liveScoreB');
+      const totalAEl = document.getElementById('liveTotalCellA');
+      const totalBEl = document.getElementById('liveTotalCellB');
+      const progEl = document.getElementById('liveSimProgressBar');
+      const feedEl = document.getElementById('livePlayFeed');
+
+      if (clockEl) clockEl.textContent = `${tick.qLabel} • ${tick.clock}`;
+      if (scoreAEl) scoreAEl.textContent = tick.scoreA;
+      if (scoreBEl) scoreBEl.textContent = tick.scoreB;
+      if (totalAEl) totalAEl.textContent = tick.scoreA;
+      if (totalBEl) totalBEl.textContent = tick.scoreB;
+      if (progEl) progEl.style.width = `${Math.round((liveSimState.currentTick / ticks.length) * 100)}%`;
+
+      if (tick.endOfQuarter) {
+        const cA = document.getElementById(`liveCellA_${tick.qIdx}`);
+        const cB = document.getElementById(`liveCellB_${tick.qIdx}`);
+        if (cA) {
+          cA.textContent = simData.quartersA[tick.qIdx];
+          cA.className = 'text-center text-white font-bold';
+        }
+        if (cB) {
+          cB.textContent = simData.quartersB[tick.qIdx];
+          cB.className = 'text-center text-white font-bold';
+        }
+      }
+
+      if (tick.event && feedEl) {
+        const badgeColor = tick.event.type === 'CLUTCH'
+          ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+          : tick.event.type === 'TURNOVER' || tick.event.type === 'FOUL'
+            ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+            : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+
+        const row = document.createElement('div');
+        row.className = 'flex items-start gap-2.5 border-b border-slate-800/60 pb-2';
+        row.innerHTML = `
+          <span class="font-mono text-[11px] text-slate-400 shrink-0">${tick.qLabel} ${tick.event.clock}</span>
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border shrink-0 ${badgeColor}">${tick.event.type}</span>
+          <span class="text-slate-200">${tick.event.text}</span>
+        `;
+        feedEl.prepend(row);
+      }
+    }
+
+    function finishLiveSimulationImmediately() {
+      if (!liveSimState) return;
+      const { match, simData } = liveSimState;
+      liveSimState.finished = true;
+      clearLiveSimTimer();
+      commitMatchResult(match, simData);
+      renderModalBoxScore(match);
+      if (window.lucide) lucide.createIcons();
+    }
+
+    // Render Post-Game Box Score Report inside Modal
+    function renderModalBoxScore(match) {
+      const box = match.boxScore;
+      const teamA = getTeam(match.teamAId);
+      const teamB = getTeam(match.teamBId);
+      const winner = getTeam(match.winnerId);
+      const involvesUser = teamA.isUser || teamB.isUser;
+      const userWon = winner && winner.isUser;
+
+      document.getElementById('modalMatchStatusBadge').textContent = `FINAL${box.isOT ? ' (OVERTIME)' : ''} • BOX SCORE`;
+      document.getElementById('modalMatchStatusBadge').className = 'text-xs font-mono font-bold px-2.5 py-0.5 rounded bg-slate-800 text-emerald-400';
+
+      const bannerHtml = involvesUser
+        ? `
+          <div class="p-4 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${userWon ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-200' : 'bg-rose-500/15 border-rose-500/40 text-rose-200'}">
+            <div class="flex items-center gap-3">
+              <div class="p-2 rounded-xl ${userWon ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500 text-white'}">
+                <i data-lucide="${userWon ? 'trophy' : 'shield-off'}" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h4 class="text-base font-extrabold text-white">${userWon ? 'VICTORY! FRANCHISE ADVANCES' : 'DEFEAT • TOURNAMENT RUN ENDED'}</h4>
+                <p class="text-xs">${userWon ? `Your franchise advances to the next stage of the bracket.` : `Your franchise was eliminated in the ${ROUND_NAMES[match.round]}.`}</p>
+              </div>
+            </div>
+            <div class="bg-slate-950/80 px-3.5 py-2 rounded-xl border border-slate-800 text-right">
+              <span class="text-[10px] uppercase font-mono text-slate-400 block">Prize Payout</span>
+              <span class="text-base font-mono font-bold text-emerald-400">+${formatCash(box.cashAwarded || 0)}</span>
+            </div>
+          </div>
+        `
+        : '';
+
+      const body = document.getElementById('modalMatchBody');
+      body.innerHTML = `
+        ${bannerHtml}
+
+        <!-- Final Scoreboard & Quarter Breakdown -->
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-5">
+          <div class="grid grid-cols-11 items-center gap-4">
+            <div class="col-span-4 flex items-center gap-3">
+              <div class="w-12 h-12 rounded-xl flex items-center justify-center font-mono font-extrabold text-slate-950 shrink-0" style="background:${teamA.color}">#${teamA.seed}</div>
+              <div>
+                <div class="text-base sm:text-lg font-extrabold ${match.winnerId === teamA.id ? 'text-white' : 'text-slate-400'}">${teamA.name}</div>
+                <div class="text-[11px] font-mono text-slate-400">FG ${box.fgPctA}% • TOV ${box.tovA}</div>
+              </div>
+            </div>
+
+            <div class="col-span-3 text-center">
+              <div class="text-2xl sm:text-4xl font-mono font-extrabold flex items-center justify-center gap-3">
+                <span class="${match.winnerId === teamA.id ? 'text-emerald-400' : 'text-slate-500'}">${match.scoreA}</span>
+                <span class="text-slate-700 text-lg">-</span>
+                <span class="${match.winnerId === teamB.id ? 'text-emerald-400' : 'text-slate-500'}">${match.scoreB}</span>
+              </div>
+              <span class="text-[10px] font-mono uppercase tracking-wider text-slate-400">Final Score</span>
+            </div>
+
+            <div class="col-span-4 flex items-center justify-end gap-3 text-right">
+              <div>
+                <div class="text-base sm:text-lg font-extrabold ${match.winnerId === teamB.id ? 'text-white' : 'text-slate-400'}">${teamB.name}</div>
+                <div class="text-[11px] font-mono text-slate-400">FG ${box.fgPctB}% • TOV ${box.tovB}</div>
+              </div>
+              <div class="w-12 h-12 rounded-xl flex items-center justify-center font-mono font-extrabold text-slate-950 shrink-0" style="background:${teamB.color}">#${teamB.seed}</div>
+            </div>
+          </div>
+
+          <!-- Quarter Table -->
+          <div class="border-t border-slate-800/80 pt-3 overflow-x-auto">
+            <table class="w-full text-xs font-mono">
+              <thead>
+                <tr class="text-slate-400 border-b border-slate-800">
+                  <th class="text-left py-1.5">CLUB</th>
+                  <th class="text-center py-1.5">Q1</th>
+                  <th class="text-center py-1.5">Q2</th>
+                  <th class="text-center py-1.5">Q3</th>
+                  <th class="text-center py-1.5">Q4</th>
+                  ${box.isOT ? `<th class="text-center py-1.5 text-amber-400">OT</th>` : ''}
+                  <th class="text-right py-1.5">FINAL</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60">
+                <tr>
+                  <td class="py-2 font-sans font-semibold text-white">${teamA.name}</td>
+                  ${box.quartersA.map(q => `<td class="text-center text-slate-300">${q}</td>`).join('')}
+                  <td class="text-right font-bold text-white">${match.scoreA}</td>
+                </tr>
+                <tr>
+                  <td class="py-2 font-sans font-semibold text-white">${teamB.name}</td>
+                  ${box.quartersB.map(q => `<td class="text-center text-slate-300">${q}</td>`).join('')}
+                  <td class="text-right font-bold text-white">${match.scoreB}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Player of the Game Spotlight -->
+        <div class="bg-gradient-to-r from-amber-500/10 via-slate-900 to-slate-900 border border-amber-500/30 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300">
+              <i data-lucide="award" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <span class="text-[10px] font-mono uppercase tracking-wider text-amber-400 block">Top Performer of the Game</span>
+              <h4 class="text-base font-extrabold text-white">${box.topPerformer.name} <span class="text-xs font-mono text-slate-400">(${box.topPerformer.pos} • ${box.topPerformer.teamName})</span></h4>
+            </div>
+          </div>
+          <div class="flex items-center gap-5 font-mono">
+            <div class="text-center">
+              <span class="text-lg font-extrabold text-amber-300">${box.topPerformer.pts}</span>
+              <span class="text-[10px] text-slate-400 block">PTS</span>
+            </div>
+            <div class="text-center">
+              <span class="text-lg font-extrabold text-white">${box.topPerformer.reb}</span>
+              <span class="text-[10px] text-slate-400 block">REB</span>
+            </div>
+            <div class="text-center">
+              <span class="text-lg font-extrabold text-white">${box.topPerformer.ast}</span>
+              <span class="text-[10px] text-slate-400 block">AST</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Team Box Score Starters & Key Events -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <!-- Starters Stats Table -->
+          <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
+            <h5 class="text-xs font-bold uppercase tracking-wider text-slate-400">Starting Lineup Box Scores</h5>
+            <div class="space-y-3 text-xs">
+              <div>
+                <div class="font-bold text-emerald-400 mb-1">${teamA.name}</div>
+                <div class="divide-y divide-slate-800/60 font-mono">
+                  ${box.playerStatsA.map(p => `
+                    <div class="py-1 flex justify-between">
+                      <span class="font-sans text-slate-200">${p.name} <span class="text-slate-500 text-[10px]">(${p.pos})</span></span>
+                      <span>${p.pts}p / ${p.reb}r / ${p.ast}a</span>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+              <div class="pt-2 border-t border-slate-800">
+                <div class="font-bold text-sky-400 mb-1">${teamB.name}</div>
+                <div class="divide-y divide-slate-800/60 font-mono">
+                  ${box.playerStatsB.map(p => `
+                    <div class="py-1 flex justify-between">
+                      <span class="font-sans text-slate-200">${p.name} <span class="text-slate-500 text-[10px]">(${p.pos})</span></span>
+                      <span>${p.pts}p / ${p.reb}r / ${p.ast}a</span>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Critical Game Events Log -->
+          <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4 flex flex-col">
+            <h5 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Critical Game Events Log</h5>
+            <div class="space-y-2.5 overflow-y-auto max-h-64 pr-1 text-xs">
+              ${box.events.map(ev => `
+                <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800/80 space-y-1">
+                  <div class="flex items-center justify-between font-mono text-[10px]">
+                    <span class="text-emerald-400 font-bold">${ev.quarter} •${ev.clock}</span>
+                    <span class="px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">${ev.type}</span>
+                  </div>
+                  <p class="text-slate-200 leading-relaxed">${ev.text}</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+
+      const footer = document.getElementById('modalMatchFooter');
+      footer.innerHTML = `
+        <div class="text-xs text-slate-400 font-mono">
+          Match ID: ${match.id.toUpperCase()} • Saved to LocalStorage
+        </div>
+        <div class="flex items-center gap-2.5">
+          <button onclick="closeMatchModal(); switchTab('franchise');" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition">
+            Visit Upgrade Store
+          </button>
+          <button onclick="closeMatchModal()" class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-extrabold transition">
+            Return to Bracket
+          </button>
+        </div>
+      `;
+    }
+
+    // Reset Save Modal Handlers
+    function openResetConfirmModal() {
+      document.getElementById('resetModalBackdrop').classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function closeResetConfirmModal() {
+      document.getElementById('resetModalBackdrop').classList.add('hidden');
+    }
+
+    function confirmFullReset() {
+      localStorage.removeItem(STORAGE_KEY);
+      state = createInitialState();
+      saveState();
+      closeResetConfirmModal();
+      closeMatchModal();
+      switchTab('bracket');
+      showToast('Save data wiped. Fresh Season 1 initialized!', 'rose');
+    }
+
+    // Toast Notification Helper
+    function showToast(message, theme = 'emerald') {
+      const container = document.getElementById('toastContainer');
+      const colorMap = {
+        emerald: 'border-emerald-500/50 bg-slate-900/95 text-emerald-300',
+        amber: 'border-amber-500/50 bg-slate-900/95 text-amber-300',
+        sky: 'border-sky-500/50 bg-slate-900/95 text-sky-300',
+        rose: 'border-rose-500/50 bg-slate-900/95 text-rose-300'
+      };
+      const toast = document.createElement('div');
+      toast.className = `pointer-events-auto border ${colorMap[theme] || colorMap.emerald} px-4 py-3 rounded-xl shadow-xl text-xs font-semibold flex items-center justify-between gap-3 transition-all duration-300`;
+      toast.innerHTML = `
+        <span>${message}</span>
+        <button onclick="this.parentElement.remove()" class="text-slate-400 hover:text-white">×</button>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => {
+        if (toast && toast.parentElement) {
+          toast.remove();
+        }
+      }, 4200);
+    }
+
+    // Boot Application
+    window.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      switchTab('bracket');
+    });
+  </script>
+</body>
+</html>
